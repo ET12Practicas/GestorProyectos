@@ -1,0 +1,135 @@
+@page "/usuarios"
+@rendermode InteractiveServer
+@inject IUsuarioService UsuarioService
+
+<PageTitle>Usuarios</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">EQUIPO</span>
+        <h1>Usuarios</h1>
+        <p>Administrá las personas que pueden participar en los proyectos.</p>
+    </div>
+</div>
+
+@if (_mensaje is not null)
+{
+    <div class="alert @(_esError ? "alert-danger" : "alert-success")" role="alert">@_mensaje</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <section class="content-card">
+            <h2>Nuevo usuario</h2>
+            <EditForm Model="_nuevoUsuario" OnValidSubmit="Crear" FormName="crear-usuario">
+                <div class="mb-3">
+                    <label class="form-label" for="nombre-usuario">Nombre</label>
+                    <InputText id="nombre-usuario" class="form-control" @bind-Value="_nuevoUsuario.Nombre" />
+                </div>
+                <button class="btn btn-primary w-100" type="submit">Crear usuario</button>
+            </EditForm>
+        </section>
+    </div>
+
+    <div class="col-lg-8">
+        <section class="content-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="mb-0">Personas</h2>
+                <span class="count-pill">@_usuarios.Count usuarios</span>
+            </div>
+
+            @if (_cargando)
+            {
+                <p><em>Cargando usuarios...</em></p>
+            }
+            else if (_usuarios.Count == 0)
+            {
+                <div class="empty-state">No hay usuarios registrados.</div>
+            }
+            else
+            {
+                <div class="user-list">
+                    @foreach (var usuario in _usuarios)
+                    {
+                        <div class="user-row">
+                            <div class="avatar">@Inicial(usuario.Nombre)</div>
+                            <div class="flex-grow-1">
+                                <strong>@usuario.Nombre</strong>
+                                <small>@usuario.Id</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Eliminar(usuario.Id)">Eliminar</button>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<UsuarioQueryDto> _usuarios = [];
+    private UsuarioCommandDto _nuevoUsuario = new() { Nombre = string.Empty };
+    private bool _cargando;
+    private bool _esError;
+    private string? _mensaje;
+
+    protected override void OnInitialized() => Cargar();
+
+    private void Cargar()
+    {
+        _cargando = true;
+
+        try
+        {
+            _usuarios = UsuarioService.ObtenerUsuarios();
+        }
+        catch (Exception ex)
+        {
+            Mostrar($"No se pudieron cargar los usuarios: {ex.Message}", true);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void Crear()
+    {
+        Ejecutar(
+            () => UsuarioService.CrearUsuario(_nuevoUsuario),
+            "Usuario creado.",
+            "Ingresá un nombre para el usuario.");
+        _nuevoUsuario = new UsuarioCommandDto { Nombre = string.Empty };
+    }
+
+    private void Eliminar(Guid usuarioId) => Ejecutar(
+        () => UsuarioService.EliminarUsuario(usuarioId),
+        "Usuario eliminado.",
+        "No se encontró el usuario.");
+
+    private void Ejecutar(Func<bool> accion, string mensajeOk, string mensajeError)
+    {
+        try
+        {
+            var correcto = accion();
+            Mostrar(correcto ? mensajeOk : mensajeError, !correcto);
+            if (correcto)
+            {
+                Cargar();
+            }
+        }
+        catch (Exception ex)
+        {
+            Mostrar($"La operación falló: {ex.Message}", true);
+        }
+    }
+
+    private void Mostrar(string mensaje, bool error)
+    {
+        _mensaje = mensaje;
+        _esError = error;
+    }
+
+    private static string Inicial(string nombre) =>
+        string.IsNullOrWhiteSpace(nombre) ? "?" : nombre[..1].ToUpperInvariant();
+}

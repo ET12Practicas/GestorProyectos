@@ -1,0 +1,100 @@
+@page "/"
+@rendermode InteractiveServer
+@inject IProyectoService ProyectoService
+@inject ITicketService TicketService
+@inject IUsuarioService UsuarioService
+@inject IComentarioService ComentarioService
+
+<PageTitle>Resumen</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">GESTOR DE PROYECTOS</span>
+        <h1>Resumen</h1>
+        <p>Una vista rápida del trabajo y las personas de tu equipo.</p>
+    </div>
+    <button class="btn btn-outline-primary" @onclick="Cargar">Actualizar</button>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+else if (_cargando)
+{
+    <p><em>Cargando información...</em></p>
+}
+else
+{
+    <div class="metric-grid">
+        <a class="metric-card" href="proyectos">
+            <span>Proyectos</span>
+            <strong>@_proyectos</strong>
+            <small>iniciativas registradas</small>
+        </a>
+        <a class="metric-card" href="tickets">
+            <span>Tickets</span>
+            <strong>@_tickets</strong>
+            <small>@_ticketsAbiertos abiertos</small>
+        </a>
+        <a class="metric-card" href="usuarios">
+            <span>Usuarios</span>
+            <strong>@_usuarios</strong>
+            <small>personas disponibles</small>
+        </a>
+        <a class="metric-card" href="comentarios">
+            <span>Comentarios</span>
+            <strong>@_comentarios</strong>
+            <small>aportes del equipo</small>
+        </a>
+    </div>
+
+    <section class="content-card mt-4">
+        <h2>Estado del trabajo</h2>
+        <div class="progress mt-3" role="progressbar" aria-label="Tickets cerrados" aria-valuenow="@PorcentajeCerrados" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" style="width: @(PorcentajeCerrados)%">@PorcentajeCerrados%</div>
+        </div>
+        <p class="text-secondary mt-2 mb-0">@_ticketsCerrados de @_tickets tickets cerrados.</p>
+    </section>
+}
+
+@code {
+    private bool _cargando;
+    private string? _error;
+    private int _proyectos;
+    private int _tickets;
+    private int _ticketsAbiertos;
+    private int _ticketsCerrados;
+    private int _usuarios;
+    private int _comentarios;
+
+    private int PorcentajeCerrados =>
+        _tickets == 0 ? 0 : (int)Math.Round(_ticketsCerrados * 100d / _tickets);
+
+    protected override void OnInitialized() => Cargar();
+
+    private void Cargar()
+    {
+        _cargando = true;
+        _error = null;
+
+        try
+        {
+            var tickets = TicketService.ObtenerTickets();
+            _proyectos = ProyectoService.ObtenerProyectos().Count;
+            _tickets = tickets.Count;
+            _ticketsAbiertos = tickets.Count(ticket => ticket.Estado == EEstadoTicket.Abierto);
+            _ticketsCerrados = tickets.Count(ticket => ticket.Estado == EEstadoTicket.Cerrado);
+            _usuarios = UsuarioService.ObtenerUsuarios().Count;
+            _comentarios = ComentarioService.ObtenerComentarios().Count;
+        }
+        catch (Exception ex)
+        {
+            _error = $"No se pudo cargar la información: {ex.Message}";
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+}

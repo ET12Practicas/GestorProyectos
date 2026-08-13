@@ -14,11 +14,14 @@ public class Usuario
     [StringLength(45)]
     public string Nombre { get; set;} = string.Empty;
 
-    [ForeignKey("IdProyecto")]
-    public Proyecto? ProyectoUsuario { get; set; } = null;
-    public Usuario()
-    {
-    }
+    [ForeignKey(nameof(ProyectoUsuario))]
+    public Guid? ProyectoId { get; set; }
+
+    [InverseProperty(nameof(Proyecto.Usuarios))]
+    public Proyecto? ProyectoUsuario { get; set; }
+
+    public Usuario() { }
+
     public Usuario(string unNombre)
     {
         Nombre = unNombre;

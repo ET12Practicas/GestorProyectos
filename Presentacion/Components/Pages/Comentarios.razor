@@ -1,0 +1,69 @@
+@page "/comentarios"
+@rendermode InteractiveServer
+@inject IComentarioService ComentarioService
+
+<PageTitle>Comentarios</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">ACTIVIDAD</span>
+        <h1>Comentarios</h1>
+        <p>Consultá los aportes realizados en los tickets.</p>
+    </div>
+    <button class="btn btn-outline-primary" @onclick="Cargar">Actualizar</button>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+else if (_cargando)
+{
+    <p><em>Cargando comentarios...</em></p>
+}
+else if (_comentarios.Count == 0)
+{
+    <div class="empty-state">Todavía no hay comentarios.</div>
+}
+else
+{
+    <div class="comment-list">
+        @foreach (var comentario in _comentarios.OrderByDescending(item => item.Fecha))
+        {
+            <article class="content-card comment-card">
+                <div class="d-flex justify-content-between gap-3 mb-2">
+                    <strong>@(comentario.Usuario?.Nombre ?? "Usuario eliminado")</strong>
+                    <time class="text-secondary">@comentario.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</time>
+                </div>
+                <p class="mb-0">@comentario.Contenido</p>
+            </article>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ComentarioQueryDto> _comentarios = [];
+    private bool _cargando;
+    private string? _error;
+
+    protected override void OnInitialized() => Cargar();
+
+    private void Cargar()
+    {
+        _cargando = true;
+        _error = null;
+
+        try
+        {
+            _comentarios = ComentarioService.ObtenerComentarios();
+        }
+        catch (Exception ex)
+        {
+            _error = $"No se pudieron cargar los comentarios: {ex.Message}";
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+}

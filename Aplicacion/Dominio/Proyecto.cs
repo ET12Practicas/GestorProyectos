@@ -13,8 +13,15 @@ public class Proyecto
     [Required]
     [StringLength(45)]
     public string Nombre { get; set; } = string.Empty;
-    public List<Usuario> Usuarios { get; set; } = new List<Usuario>();
-    public List<Ticket> Tickets { get; set; } = new List<Ticket>();
+
+    [InverseProperty(nameof(Usuario.ProyectoUsuario))]
+    public List<Usuario> Usuarios { get; set; } = [];
+
+    [InverseProperty(nameof(Ticket.ProyectoTicket))]
+    public List<Ticket> Tickets { get; set; } = [];
+
+    public Proyecto() { }
+
     public Proyecto(string nombre)
     {
         Nombre = nombre;

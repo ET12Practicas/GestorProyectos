@@ -1,0 +1,264 @@
+@page "/proyectos"
+@rendermode InteractiveServer
+@inject IProyectoService ProyectoService
+@inject IUsuarioService UsuarioService
+
+<PageTitle>Proyectos</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">PLANIFICACIÓN</span>
+        <h1>Proyectos</h1>
+        <p>Creá proyectos, agregá tickets y sumá personas al equipo.</p>
+    </div>
+</div>
+
+@if (_mensaje is not null)
+{
+    <div class="alert @(_esError ? "alert-danger" : "alert-success")" role="alert">@_mensaje</div>
+}
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <section class="content-card h-100">
+            <h2>Nuevo proyecto</h2>
+            <EditForm Model="_nuevoProyecto" OnValidSubmit="CrearProyecto" FormName="crear-proyecto">
+                <div class="mb-3">
+                    <label class="form-label" for="nombre-proyecto">Nombre</label>
+                    <InputText id="nombre-proyecto" class="form-control" @bind-Value="_nuevoProyecto.Nombre" />
+                </div>
+                <button class="btn btn-primary w-100" type="submit">Crear proyecto</button>
+            </EditForm>
+        </section>
+    </div>
+
+    <div class="col-lg-4">
+        <section class="content-card h-100">
+            <h2>Nuevo ticket</h2>
+            <EditForm Model="_nuevoTicket" OnValidSubmit="CrearTicket" FormName="crear-ticket">
+                <div class="mb-3">
+                    <label class="form-label" for="proyecto-ticket">Proyecto</label>
+                    <InputSelect id="proyecto-ticket" class="form-select" @bind-Value="_proyectoTicketId">
+                        <option value="@Guid.Empty">Seleccionar...</option>
+                        @foreach (var proyecto in _proyectos)
+                        {
+                            <option value="@proyecto.Id">@proyecto.Nombre</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="nombre-ticket">Nombre</label>
+                    <InputText id="nombre-ticket" class="form-control" @bind-Value="_nuevoTicket.Nombre" />
+                </div>
+                <button class="btn btn-primary w-100" type="submit">Agregar ticket</button>
+            </EditForm>
+        </section>
+    </div>
+
+    <div class="col-lg-4">
+        <section class="content-card h-100">
+            <h2>Sumar usuario</h2>
+            <EditForm Model="_asignacion" OnValidSubmit="AsignarUsuario" FormName="asignar-usuario">
+                <div class="mb-3">
+                    <label class="form-label" for="proyecto-usuario">Proyecto</label>
+                    <InputSelect id="proyecto-usuario" class="form-select" @bind-Value="_asignacion.ProyectoId">
+                        <option value="@Guid.Empty">Seleccionar...</option>
+                        @foreach (var proyecto in _proyectos)
+                        {
+                            <option value="@proyecto.Id">@proyecto.Nombre</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="usuario-proyecto">Usuario</label>
+                    <InputSelect id="usuario-proyecto" class="form-select" @bind-Value="_asignacion.UsuarioId">
+                        <option value="@Guid.Empty">Seleccionar...</option>
+                        @foreach (var usuario in _usuarios)
+                        {
+                            <option value="@usuario.Id">@usuario.Nombre</option>
+                        }
+                    </InputSelect>
+                </div>
+                <button class="btn btn-outline-primary w-100" type="submit">Asignar al proyecto</button>
+            </EditForm>
+        </section>
+    </div>
+</div>
+
+@if (_cargando)
+{
+    <p><em>Cargando proyectos...</em></p>
+}
+else if (_proyectos.Count == 0)
+{
+    <div class="empty-state">Todavía no hay proyectos. Creá el primero para empezar.</div>
+}
+else
+{
+    <div class="project-grid">
+        @foreach (var proyecto in _proyectos)
+        {
+            <article class="content-card project-card">
+                <div class="d-flex justify-content-between align-items-start gap-3">
+                    <div>
+                        <span class="eyebrow">PROYECTO</span>
+                        <h2 class="mb-1">@proyecto.Nombre</h2>
+                    </div>
+                    <span class="count-pill">@proyecto.Tickets.Count tickets</span>
+                </div>
+
+                <div class="mt-4">
+                    <h3>Equipo</h3>
+                    @if (proyecto.Usuarios.Count == 0)
+                    {
+                        <p class="text-secondary">Sin usuarios asignados.</p>
+                    }
+                    else
+                    {
+                        <div class="chip-list">
+                            @foreach (var usuario in proyecto.Usuarios)
+                            {
+                                <span class="person-chip">@usuario.Nombre</span>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-4">
+                    <h3>Tickets</h3>
+                    @if (proyecto.Tickets.Count == 0)
+                    {
+                        <p class="text-secondary mb-0">Sin tickets.</p>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var ticket in proyecto.Tickets)
+                            {
+                                <div class="list-group-item px-0 d-flex justify-content-between align-items-center gap-3">
+                                    <span>@ticket.Nombre</span>
+                                    <span class="status-badge @ClaseEstado(ticket.Estado)">@TextoEstado(ticket.Estado)</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ProyectoQueryDto> _proyectos = [];
+    private IReadOnlyList<UsuarioQueryDto> _usuarios = [];
+    private ProyectoCommandDto _nuevoProyecto = new() { Nombre = string.Empty };
+    private TicketCommandDto _nuevoTicket = new() { Nombre = string.Empty };
+    private AsignacionModel _asignacion = new();
+    private Guid _proyectoTicketId;
+    private bool _cargando;
+    private bool _esError;
+    private string? _mensaje;
+
+    protected override void OnInitialized() => Cargar();
+
+    private void Cargar()
+    {
+        _cargando = true;
+
+        try
+        {
+            _proyectos = ProyectoService.ObtenerProyectos();
+            _usuarios = UsuarioService.ObtenerUsuarios();
+        }
+        catch (Exception ex)
+        {
+            Mostrar($"No se pudieron cargar los proyectos: {ex.Message}", true);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void CrearProyecto()
+    {
+        Ejecutar(
+            () => ProyectoService.CrearProyecto(_nuevoProyecto),
+            "Proyecto creado.",
+            "Ingresá un nombre para el proyecto.");
+        _nuevoProyecto = new ProyectoCommandDto { Nombre = string.Empty };
+    }
+
+    private void CrearTicket()
+    {
+        if (_proyectoTicketId == Guid.Empty)
+        {
+            Mostrar("Seleccioná un proyecto.", true);
+            return;
+        }
+
+        Ejecutar(
+            () => ProyectoService.CrearTicket(_proyectoTicketId, _nuevoTicket),
+            "Ticket agregado.",
+            "No se pudo agregar el ticket.");
+        _nuevoTicket = new TicketCommandDto { Nombre = string.Empty };
+    }
+
+    private void AsignarUsuario()
+    {
+        if (_asignacion.ProyectoId == Guid.Empty || _asignacion.UsuarioId == Guid.Empty)
+        {
+            Mostrar("Seleccioná un proyecto y un usuario.", true);
+            return;
+        }
+
+        Ejecutar(
+            () => ProyectoService.AsignarUsuarioAProyecto(_asignacion.UsuarioId, _asignacion.ProyectoId),
+            "Usuario asignado.",
+            "No se pudo asignar el usuario.");
+        _asignacion = new AsignacionModel();
+    }
+
+    private void Ejecutar(Func<bool> accion, string mensajeOk, string mensajeError)
+    {
+        try
+        {
+            var correcto = accion();
+            Mostrar(correcto ? mensajeOk : mensajeError, !correcto);
+            if (correcto)
+            {
+                Cargar();
+            }
+        }
+        catch (Exception ex)
+        {
+            Mostrar($"La operación falló: {ex.Message}", true);
+        }
+    }
+
+    private void Mostrar(string mensaje, bool error)
+    {
+        _mensaje = mensaje;
+        _esError = error;
+    }
+
+    private static string ClaseEstado(EEstadoTicket estado) => estado switch
+    {
+        EEstadoTicket.Cerrado => "status-closed",
+        EEstadoTicket.EnProgreso => "status-progress",
+        EEstadoTicket.Testing => "status-testing",
+        _ => "status-open"
+    };
+
+    private static string TextoEstado(EEstadoTicket estado) => estado switch
+    {
+        EEstadoTicket.EnProgreso => "En progreso",
+        _ => estado.ToString()
+    };
+
+    private sealed class AsignacionModel
+    {
+        public Guid ProyectoId { get; set; }
+        public Guid UsuarioId { get; set; }
+    }
+}

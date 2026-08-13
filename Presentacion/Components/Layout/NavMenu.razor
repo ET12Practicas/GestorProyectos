@@ -1,0 +1,42 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Gestor de proyectos</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="nav-symbol" aria-hidden="true">⌂</span> Resumen
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="proyectos">
+                <span class="nav-symbol" aria-hidden="true">▦</span> Proyectos
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="tickets">
+                <span class="nav-symbol" aria-hidden="true">✓</span> Tickets
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="usuarios">
+                <span class="nav-symbol" aria-hidden="true">♙</span> Usuarios
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="comentarios">
+                <span class="nav-symbol" aria-hidden="true">◌</span> Comentarios
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
