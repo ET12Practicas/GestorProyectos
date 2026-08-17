@@ -7,7 +7,6 @@ namespace Aplicacion.Dominio;
 public class Comentario
 {
     [Key]
-    [Required]
     public Guid IdComentario { get; set; } = Guid.NewGuid();
 
     [ForeignKey(nameof(UsuarioComentario))]
@@ -18,10 +17,8 @@ public class Comentario
     [InverseProperty(nameof(Aplicacion.Dominio.Ticket.ComentarioTicket))]
     public Ticket? Ticket { get; set; }
 
-    [Required]
     public DateTime FechaComentario { get; set; } = DateTime.UtcNow;
 
-    [Required]
     public string Contenido { get; set; } = string.Empty;
 
     public Comentario() { }
