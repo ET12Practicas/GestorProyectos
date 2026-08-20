@@ -7,11 +7,8 @@ namespace Aplicacion.Dominio;
 public class Usuario
 {
     [Key]
-    [Required]
     public Guid Id { get; set;} = Guid.NewGuid();
-    
-    [Required]
-    [StringLength(45)]
+
     public string Nombre { get; set;} = string.Empty;
 
     [ForeignKey(nameof(ProyectoUsuario))]
