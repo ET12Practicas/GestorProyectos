@@ -59,7 +59,7 @@ internal sealed class ProyectoService(
             return false;
         }
 
-        var ticket = new Ticket(dto.Nombre.Trim());
+        var ticket = new Ticket(dto.Nombre.Trim(), dto.Descripcion?.Trim() ?? string.Empty);
         proyecto.Tickets.Add(ticket);
         ticketRepository.AgregarTicket(ticket);
         unidadDeTrabajo.GuardarCambios();

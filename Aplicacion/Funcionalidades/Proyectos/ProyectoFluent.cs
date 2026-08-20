@@ -12,7 +12,7 @@ namespace Aplicacion.Funcionalidades.Proyectos
             
             RuleFor(x => x.Nombre)
                 .NotEmpty().WithMessage("El proyecto debe tener un nombre")
-                .MaximumLength(45).WithMesssage("El nombre del proyecto no debe pasar los 45 caracteres.");
+                .MaximumLength(45).WithMessage("El nombre del proyecto no debe pasar los 45 caracteres.");
         }
     }
 }

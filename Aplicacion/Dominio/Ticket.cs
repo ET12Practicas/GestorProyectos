@@ -11,14 +11,10 @@ public class Ticket
     [Required]
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    [Required]
-    [StringLength(45)]
     public string Nombre { get; set; } = string.Empty;
 
-    [Required]
     public string Descripcion { get; set; } = string.Empty;
 
-    [Required]
     public DateTime FechaTicket { get; set; } = DateTime.UtcNow;
 
     [ForeignKey(nameof(UsuarioTicket))]
@@ -42,9 +38,10 @@ public class Ticket
 
     public Ticket() { }
 
-    public Ticket(string nombre)
+    public Ticket(string nombre, string descripcion)
     {
         Nombre = nombre;
+        Descripcion = descripcion;
     }
 
     public void AgregarUsuario(Usuario usuario) => UsuarioTicket = usuario;

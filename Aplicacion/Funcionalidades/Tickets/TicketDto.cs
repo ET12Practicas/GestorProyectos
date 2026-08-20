@@ -7,6 +7,7 @@ namespace Aplicacion.Funcionalidades.Tickets;
 public sealed class TicketCommandDto
 {
     public required string Nombre { get; set; }
+    public required string Descripcion { get; set; }
 }
 
 public sealed class EstadoTicketDto
