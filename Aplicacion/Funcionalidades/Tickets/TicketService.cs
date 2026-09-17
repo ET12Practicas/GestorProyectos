@@ -23,6 +23,7 @@ internal sealed class TicketService(ITicketRepository ticketRepository) : ITicke
         {
             Id = ticket.Id,
             Nombre = ticket.Nombre,
+            Descripcion = ticket.Descripcion,
             Estado = ticket.Estado,
             Fecha = ticket.FechaTicket,
             Usuario = ticket.UsuarioTicket is null

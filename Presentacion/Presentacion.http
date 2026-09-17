@@ -1,0 +1,12 @@
+@host=http://localhost:5109/api
+
+### Obtiene todos los proyectos
+GET {{host}}/proyecto
+
+### Crea un nuevo proyecto
+POST {{host}}/proyecto
+Content-Type: application/json
+
+{
+    "nombre": "Creación httpYac"
+}

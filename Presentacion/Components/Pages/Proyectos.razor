@@ -152,7 +152,7 @@ else
     private IReadOnlyList<ProyectoQueryDto> _proyectos = [];
     private IReadOnlyList<UsuarioQueryDto> _usuarios = [];
     private ProyectoCommandDto _nuevoProyecto = new() { Nombre = string.Empty };
-    private TicketCommandDto _nuevoTicket = new() { Nombre = string.Empty };
+    private TicketCommandDto _nuevoTicket = new() { Nombre = string.Empty, Descripcion = string.Empty };
     private AsignacionModel _asignacion = new();
     private Guid _proyectoTicketId;
     private bool _cargando;
@@ -201,7 +201,7 @@ else
             () => ProyectoService.CrearTicket(_proyectoTicketId, _nuevoTicket),
             "Ticket agregado.",
             "No se pudo agregar el ticket.");
-        _nuevoTicket = new TicketCommandDto { Nombre = string.Empty };
+        _nuevoTicket = new TicketCommandDto { Nombre = string.Empty, Descripcion = string.Empty };
     }
 
     private void AsignarUsuario()

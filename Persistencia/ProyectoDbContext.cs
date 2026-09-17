@@ -25,9 +25,9 @@ public sealed class ProyectoDbContext : DbContext
         );
 
         modelBuilder.Entity<Ticket>().HasData(
-            CrearTicketSemilla("20000000-0000-0000-0000-000000000001", "Programacion"),
-            CrearTicketSemilla("20000000-0000-0000-0000-000000000002", "Analisis"),
-            CrearTicketSemilla("20000000-0000-0000-0000-000000000003", "Logica")
+            CrearTicketSemilla("20000000-0000-0000-0000-000000000001", "Programacion", "Implementar funciones asincrónicas"),
+            CrearTicketSemilla("20000000-0000-0000-0000-000000000002", "Analisis", "Analizar diseño actual de la página"),
+            CrearTicketSemilla("20000000-0000-0000-0000-000000000003", "Logica", "Falta agregar validación en el formulario de registro")
         );
 
         modelBuilder.Entity<Proyecto>().HasData(
@@ -37,9 +37,9 @@ public sealed class ProyectoDbContext : DbContext
         );
     }
 
-    private static Ticket CrearTicketSemilla(string id, string nombre)
+    private static Ticket CrearTicketSemilla(string id, string nombre, string descripcion)
     {
-        return new Ticket(nombre)
+        return new Ticket(nombre, descripcion)
         {
             Id = Guid.Parse(id),
             FechaTicket = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
