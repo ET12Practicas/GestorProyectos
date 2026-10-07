@@ -2,5 +2,5 @@ namespace Aplicacion.Abstracciones;
 
 public interface IUnidadDeTrabajo
 {
-    void GuardarCambios();
+    Task<int> GuardarCambiosAsync(CancellationToken cancellationToken = default);
 }

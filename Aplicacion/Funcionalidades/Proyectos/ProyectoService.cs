@@ -1,175 +1,127 @@
 using Aplicacion.Abstracciones;
+using Aplicacion.Comun;
 using Aplicacion.Dominio;
-using Aplicacion.Funcionalidades.Comentarios;
 using Aplicacion.Funcionalidades.Tickets;
 using Aplicacion.Funcionalidades.Usuarios;
+using FluentValidation;
 
 namespace Aplicacion.Funcionalidades.Proyectos;
 
 public interface IProyectoService
 {
-    IReadOnlyList<ProyectoQueryDto> ObtenerProyectos();
-    bool CrearProyecto(ProyectoCommandDto dto);
-    bool CrearTicket(Guid proyectoId, TicketCommandDto dto);
-    bool EliminarTicket(Guid ticketId);
-    bool AsignarUsuarioATicket(Guid ticketId, Guid usuarioId);
-    bool CambiarEstadoTicket(Guid ticketId, EstadoTicketDto dto);
-    bool QuitarUsuarioDeProyectos(Guid usuarioId, Guid ticketId);
-    bool AsignarUsuarioAProyecto(Guid usuarioId, Guid proyectoId);
-    bool CrearComentario(Guid ticketId, Guid usuarioId, ComentarioCommandDto dto);
+    Task<IReadOnlyList<ProyectoQueryDto>> ObtenerProyectosAsync(CancellationToken cancellationToken = default);
+    Task<ProyectoQueryDto?> ObtenerProyectoPorIdAsync(Guid proyectoId, CancellationToken cancellationToken = default);
+    Task<Result<Guid>> CrearProyectoAsync(ProyectoCommandDto dto, CancellationToken cancellationToken = default);
+    Task<Result> AsignarUsuarioAProyectoAsync(Guid proyectoId, Guid usuarioId, CancellationToken cancellationToken = default);
+    Task<Result> QuitarUsuarioDeProyectoAsync(Guid proyectoId, Guid usuarioId, CancellationToken cancellationToken = default);
+    Task<Result> EliminarProyectoAsync(Guid proyectoId, CancellationToken cancellationToken = default);
 }
 
 internal sealed class ProyectoService(
     IProyectoRepository proyectoRepository,
-    ITicketRepository ticketRepository,
     IUsuarioRepository usuarioRepository,
-    IComentarioRepository comentarioRepository,
-    IUnidadDeTrabajo unidadDeTrabajo) : IProyectoService
+    IUnidadDeTrabajo unidadDeTrabajo,
+    IValidator<ProyectoCommandDto> validator) : IProyectoService
 {
-    public IReadOnlyList<ProyectoQueryDto> ObtenerProyectos()
+    public async Task<IReadOnlyList<ProyectoQueryDto>> ObtenerProyectosAsync(CancellationToken cancellationToken = default)
     {
-        return proyectoRepository.ObtenerProyectosConDetalles()
-            .Select(proyecto => new ProyectoQueryDto
-            {
-                Id = proyecto.IdProject,
-                Nombre = proyecto.Nombre,
-                Tickets = proyecto.Tickets.Select(TicketService.MapearTicket).ToList(),
-                Usuarios = proyecto.Usuarios.Select(UsuarioService.MapearUsuario).ToList()
-            })
-            .ToList();
+        var proyectos = await proyectoRepository.ObtenerProyectosConDetallesAsync(cancellationToken);
+        return proyectos.Select(MapearProyecto).ToList();
     }
 
-    public bool CrearProyecto(ProyectoCommandDto dto)
+    public async Task<ProyectoQueryDto?> ObtenerProyectoPorIdAsync(Guid proyectoId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(dto.Nombre))
-        {
-            return false;
-        }
-
-        proyectoRepository.AgregarProyecto(new Proyecto(dto.Nombre.Trim()));
-        unidadDeTrabajo.GuardarCambios();
-        return true;
+        var proyecto = await proyectoRepository.ObtenerProyectoAsync(proyectoId, cancellationToken);
+        return proyecto is null ? null : MapearProyecto(proyecto);
     }
 
-    public bool CrearTicket(Guid proyectoId, TicketCommandDto dto)
+    public async Task<Result<Guid>> CrearProyectoAsync(ProyectoCommandDto dto, CancellationToken cancellationToken = default)
     {
-        var proyecto = proyectoRepository.ObtenerProyecto(proyectoId);
-        if (proyecto is null || string.IsNullOrWhiteSpace(dto.Nombre))
+        var validacion = await validator.ValidateAsync(dto, cancellationToken);
+        if (!validacion.IsValid)
         {
-            return false;
+            var primerError = validacion.Errors[0].ErrorMessage;
+            return Result.Failure<Guid>(Error.Validation(primerError));
         }
 
-        var ticket = new Ticket(dto.Nombre.Trim(), dto.Descripcion?.Trim() ?? string.Empty);
-        proyecto.Tickets.Add(ticket);
-        ticketRepository.AgregarTicket(ticket);
-        unidadDeTrabajo.GuardarCambios();
-        return true;
+        var proyecto = new Proyecto(dto.Nombre.Trim());
+        proyectoRepository.AgregarProyecto(proyecto);
+        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
+
+        return Result.Success(proyecto.Id);
     }
 
-    public bool EliminarTicket(Guid ticketId)
+    public async Task<Result> AsignarUsuarioAProyectoAsync(Guid proyectoId, Guid usuarioId, CancellationToken cancellationToken = default)
     {
-        var ticket = ticketRepository.ObtenerTicket(ticketId);
-        if (ticket is null)
+        var proyecto = await proyectoRepository.ObtenerProyectoAsync(proyectoId, cancellationToken);
+        if (proyecto is null)
         {
-            return false;
+            return Result.Failure(Error.NotFound("Proyecto no encontrado."));
         }
 
-        ticketRepository.EliminarTicket(ticket);
-        unidadDeTrabajo.GuardarCambios();
-        return true;
+        var usuario = await usuarioRepository.ObtenerUsuarioAsync(usuarioId, cancellationToken);
+        if (usuario is null)
+        {
+            return Result.Failure(Error.NotFound("Usuario no encontrado."));
+        }
+
+        if (proyecto.Usuarios.Any(u => u.Id == usuarioId))
+        {
+            return Result.Success(); // Ya pertenece al proyecto
+        }
+
+        proyecto.Usuarios.Add(usuario);
+        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
+        return Result.Success();
     }
 
-    public bool AsignarUsuarioATicket(Guid ticketId, Guid usuarioId)
+    public async Task<Result> QuitarUsuarioDeProyectoAsync(Guid proyectoId, Guid usuarioId, CancellationToken cancellationToken = default)
     {
-        var ticket = ticketRepository.ObtenerTicket(ticketId);
-        var usuario = usuarioRepository.ObtenerUsuario(usuarioId);
-        if (ticket is null || usuario is null ||
-            !proyectoRepository.ExisteProyectoConUsuarioYTicket(usuarioId, ticketId))
+        var proyecto = await proyectoRepository.ObtenerProyectoAsync(proyectoId, cancellationToken);
+        if (proyecto is null)
         {
-            return false;
+            return Result.Failure(Error.NotFound("Proyecto no encontrado."));
         }
 
-        ticket.AgregarUsuario(usuario);
-        unidadDeTrabajo.GuardarCambios();
-        return true;
-    }
-
-    public bool CambiarEstadoTicket(Guid ticketId, EstadoTicketDto dto)
-    {
-        var ticket = ticketRepository.ObtenerTicket(ticketId);
-        if (ticket is null || !Enum.IsDefined(dto.Estado))
+        var usuario = proyecto.Usuarios.FirstOrDefault(u => u.Id == usuarioId);
+        if (usuario is null)
         {
-            return false;
+            return Result.Failure(Error.NotFound("El usuario no forma parte de este proyecto."));
         }
 
-        ticket.Estado = dto.Estado;
-        unidadDeTrabajo.GuardarCambios();
-        return true;
-    }
-
-    public bool QuitarUsuarioDeProyectos(Guid usuarioId, Guid ticketId)
-    {
-        var usuario = usuarioRepository.ObtenerUsuario(usuarioId);
-        var ticket = ticketRepository.ObtenerTicket(ticketId);
-        var proyectos = proyectoRepository.ObtenerProyectosDelUsuario(usuarioId);
-        if (usuario is null || ticket is null || proyectos.Count == 0)
-        {
-            return false;
-        }
-
-        if (ticket.UsuarioTicket?.Id == usuarioId)
+        // Si el usuario tenía tickets asignados en este proyecto, se desasignan
+        foreach (var ticket in proyecto.Tickets.Where(t => t.UsuarioId == usuarioId))
         {
             ticket.UsuarioTicket = null;
+            ticket.UsuarioId = null;
         }
 
-        foreach (var proyecto in proyectos)
-        {
-            proyecto.Usuarios.Remove(usuario);
-        }
-
-        unidadDeTrabajo.GuardarCambios();
-        return true;
+        proyecto.Usuarios.Remove(usuario);
+        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
+        return Result.Success();
     }
 
-    public bool AsignarUsuarioAProyecto(Guid usuarioId, Guid proyectoId)
+    public async Task<Result> EliminarProyectoAsync(Guid proyectoId, CancellationToken cancellationToken = default)
     {
-        var usuario = usuarioRepository.ObtenerUsuario(usuarioId);
-        var proyecto = proyectoRepository.ObtenerProyecto(proyectoId);
-        if (usuario is null || proyecto is null)
+        var proyecto = await proyectoRepository.ObtenerProyectoAsync(proyectoId, cancellationToken);
+        if (proyecto is null)
         {
-            return false;
+            return Result.Failure(Error.NotFound("Proyecto no encontrado."));
         }
 
-        if (proyecto.Usuarios.All(item => item.Id != usuarioId))
-        {
-            proyecto.Usuarios.Add(usuario);
-            unidadDeTrabajo.GuardarCambios();
-        }
-
-        return true;
+        proyectoRepository.EliminarProyecto(proyecto);
+        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
+        return Result.Success();
     }
 
-    public bool CrearComentario(
-        Guid ticketId,
-        Guid usuarioId,
-        ComentarioCommandDto dto)
+    internal static ProyectoQueryDto MapearProyecto(Proyecto proyecto)
     {
-        var ticket = ticketRepository.ObtenerTicket(ticketId);
-        var usuario = usuarioRepository.ObtenerUsuario(usuarioId);
-        if (ticket is null || usuario is null || string.IsNullOrWhiteSpace(dto.Contenido) ||
-            !proyectoRepository.ExisteProyectoConUsuarioYTicket(usuarioId, ticketId))
+        return new ProyectoQueryDto
         {
-            return false;
-        }
-
-        var comentario = new Comentario(dto.Contenido.Trim())
-        {
-            UsuarioComentario = usuario
+            Id = proyecto.Id,
+            Nombre = proyecto.Nombre,
+            Tickets = proyecto.Tickets.Select(TicketService.MapearTicket).ToList(),
+            Usuarios = proyecto.Usuarios.Select(UsuarioService.MapearUsuario).ToList()
         };
-
-        ticket.AgregarComentario(comentario);
-        comentarioRepository.AgregarComentario(comentario);
-        unidadDeTrabajo.GuardarCambios();
-        return true;
     }
 }

@@ -6,42 +6,49 @@ namespace Persistencia;
 
 internal sealed class ProyectoRepository(ProyectoDbContext context) : IProyectoRepository
 {
-    public IReadOnlyList<Proyecto> ObtenerProyectosConDetalles()
+    public async Task<IReadOnlyList<Proyecto>> ObtenerProyectosConDetallesAsync(CancellationToken cancellationToken = default)
     {
-        return context.Proyectos
+        return await context.Proyectos
             .AsNoTracking()
             .AsSplitQuery()
             .Include(proyecto => proyecto.Usuarios)
             .Include(proyecto => proyecto.Tickets)
                 .ThenInclude(ticket => ticket.UsuarioTicket)
             .Include(proyecto => proyecto.Tickets)
-                .ThenInclude(ticket => ticket.ComentarioTicket)
-                    .ThenInclude(comentario => comentario!.UsuarioComentario)
-            .ToList();
+                .ThenInclude(ticket => ticket.Comentarios)
+                    .ThenInclude(comentario => comentario.UsuarioComentario)
+            .ToListAsync(cancellationToken);
     }
 
-    public Proyecto? ObtenerProyecto(Guid proyectoId)
+    public async Task<Proyecto?> ObtenerProyectoAsync(Guid proyectoId, CancellationToken cancellationToken = default)
     {
-        return context.Proyectos
+        return await context.Proyectos
             .Include(proyecto => proyecto.Usuarios)
             .Include(proyecto => proyecto.Tickets)
-            .FirstOrDefault(proyecto => proyecto.IdProject == proyectoId);
+            .FirstOrDefaultAsync(proyecto => proyecto.Id == proyectoId, cancellationToken);
     }
 
-    public IReadOnlyList<Proyecto> ObtenerProyectosDelUsuario(Guid usuarioId)
+    public async Task<IReadOnlyList<Proyecto>> ObtenerProyectosDelUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
-        return context.Proyectos
+        return await context.Proyectos
             .Include(proyecto => proyecto.Usuarios)
             .Where(proyecto => proyecto.Usuarios.Any(usuario => usuario.Id == usuarioId))
-            .ToList();
+            .ToListAsync(cancellationToken);
     }
 
-    public bool ExisteProyectoConUsuarioYTicket(Guid usuarioId, Guid ticketId)
+    public async Task<bool> ExisteProyectoConUsuarioYTicketAsync(Guid usuarioId, Guid ticketId, CancellationToken cancellationToken = default)
     {
-        return context.Proyectos.Any(proyecto =>
+        return await context.Proyectos.AnyAsync(proyecto =>
             proyecto.Usuarios.Any(usuario => usuario.Id == usuarioId) &&
-            proyecto.Tickets.Any(ticket => ticket.Id == ticketId));
+            proyecto.Tickets.Any(ticket => ticket.Id == ticketId), cancellationToken);
+    }
+
+    public async Task<bool> ExisteProyectoAsync(Guid proyectoId, CancellationToken cancellationToken = default)
+    {
+        return await context.Proyectos.AnyAsync(p => p.Id == proyectoId, cancellationToken);
     }
 
     public void AgregarProyecto(Proyecto proyecto) => context.Proyectos.Add(proyecto);
+
+    public void EliminarProyecto(Proyecto proyecto) => context.Proyectos.Remove(proyecto);
 }

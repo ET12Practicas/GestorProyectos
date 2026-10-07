@@ -13,7 +13,7 @@
         <h1>Resumen</h1>
         <p>Una vista rápida del trabajo y las personas de tu equipo.</p>
     </div>
-    <button class="btn btn-outline-primary" @onclick="Cargar">Actualizar</button>
+    <button class="btn btn-outline-primary" @onclick="CargarAsync">Actualizar</button>
 </div>
 
 @if (_error is not null)
@@ -71,22 +71,26 @@ else
     private int PorcentajeCerrados =>
         _tickets == 0 ? 0 : (int)Math.Round(_ticketsCerrados * 100d / _tickets);
 
-    protected override void OnInitialized() => Cargar();
+    protected override async Task OnInitializedAsync() => await CargarAsync();
 
-    private void Cargar()
+    private async Task CargarAsync()
     {
         _cargando = true;
         _error = null;
 
         try
         {
-            var tickets = TicketService.ObtenerTickets();
-            _proyectos = ProyectoService.ObtenerProyectos().Count;
+            var tickets = await TicketService.ObtenerTicketsAsync();
+            var proyectos = await ProyectoService.ObtenerProyectosAsync();
+            var usuarios = await UsuarioService.ObtenerUsuariosAsync();
+            var comentarios = await ComentarioService.ObtenerComentariosAsync();
+
+            _proyectos = proyectos.Count;
             _tickets = tickets.Count;
             _ticketsAbiertos = tickets.Count(ticket => ticket.Estado == EEstadoTicket.Abierto);
             _ticketsCerrados = tickets.Count(ticket => ticket.Estado == EEstadoTicket.Cerrado);
-            _usuarios = UsuarioService.ObtenerUsuarios().Count;
-            _comentarios = ComentarioService.ObtenerComentarios().Count;
+            _usuarios = usuarios.Count;
+            _comentarios = comentarios.Count;
         }
         catch (Exception ex)
         {

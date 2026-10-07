@@ -4,5 +4,6 @@ namespace Persistencia;
 
 internal sealed class UnidadDeTrabajo(ProyectoDbContext context) : IUnidadDeTrabajo
 {
-    public void GuardarCambios() => context.SaveChanges();
+    public Task<int> GuardarCambiosAsync(CancellationToken cancellationToken = default) =>
+        context.SaveChangesAsync(cancellationToken);
 }

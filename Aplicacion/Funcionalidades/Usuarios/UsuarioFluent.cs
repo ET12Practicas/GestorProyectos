@@ -1,19 +1,13 @@
 using FluentValidation;
-using Aplicacion.Dominio;
 
-namespace Aplicacion.Funcionalidades.Usuarios
+namespace Aplicacion.Funcionalidades.Usuarios;
+
+public class UsuarioCommandDtoValidator : AbstractValidator<UsuarioCommandDto>
 {
-    public class UsuarioFluent : AbstractValidator<Usuario>
+    public UsuarioCommandDtoValidator()
     {
-        public UsuarioFluent()
-        {
-            RuleFor(x => x.Id)
-                .NotEmpty().WithMessage("Id no detectado.");
-
-            RuleFor (x => x.Nombre)
-                .NotEmpty().WithMessage("No se puede dejar vacio este espacio.")
-                .MaximumLength(45).WithMessage("El nombre no puede superar los 45 caracteres");
-        }
-        
+        RuleFor(x => x.Nombre)
+            .NotEmpty().WithMessage("El nombre de usuario es obligatorio.")
+            .MaximumLength(45).WithMessage("El nombre no puede superar los 45 caracteres.");
     }
 }

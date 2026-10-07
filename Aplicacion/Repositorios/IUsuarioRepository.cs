@@ -4,8 +4,9 @@ namespace Aplicacion.Abstracciones;
 
 public interface IUsuarioRepository
 {
-    IReadOnlyList<Usuario> ObtenerUsuarios();
-    Usuario? ObtenerUsuario(Guid usuarioId);
+    Task<IReadOnlyList<Usuario>> ObtenerUsuariosAsync(CancellationToken cancellationToken = default);
+    Task<Usuario?> ObtenerUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default);
+    Task<bool> ExisteUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default);
     void AgregarUsuario(Usuario usuario);
     void EliminarUsuario(Usuario usuario);
 }

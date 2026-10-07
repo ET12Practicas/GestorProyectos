@@ -21,7 +21,7 @@
     <div class="col-lg-4">
         <section class="content-card">
             <h2>Nuevo usuario</h2>
-            <EditForm Model="_nuevoUsuario" OnValidSubmit="Crear" FormName="crear-usuario">
+            <EditForm Model="_nuevoUsuario" OnValidSubmit="CrearAsync" FormName="crear-usuario">
                 <div class="mb-3">
                     <label class="form-label" for="nombre-usuario">Nombre</label>
                     <InputText id="nombre-usuario" class="form-control" @bind-Value="_nuevoUsuario.Nombre" />
@@ -57,7 +57,7 @@
                                 <strong>@usuario.Nombre</strong>
                                 <small>@usuario.Id</small>
                             </div>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Eliminar(usuario.Id)">Eliminar</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(usuario.Id)">Eliminar</button>
                         </div>
                     }
                 </div>
@@ -73,15 +73,15 @@
     private bool _esError;
     private string? _mensaje;
 
-    protected override void OnInitialized() => Cargar();
+    protected override async Task OnInitializedAsync() => await CargarAsync();
 
-    private void Cargar()
+    private async Task CargarAsync()
     {
         _cargando = true;
 
         try
         {
-            _usuarios = UsuarioService.ObtenerUsuarios();
+            _usuarios = await UsuarioService.ObtenerUsuariosAsync();
         }
         catch (Exception ex)
         {
@@ -93,34 +93,32 @@
         }
     }
 
-    private void Crear()
+    private async Task CrearAsync()
     {
-        Ejecutar(
-            () => UsuarioService.CrearUsuario(_nuevoUsuario),
-            "Usuario creado.",
-            "Ingresá un nombre para el usuario.");
-        _nuevoUsuario = new UsuarioCommandDto { Nombre = string.Empty };
+        var result = await UsuarioService.CrearUsuarioAsync(_nuevoUsuario);
+        if (result.IsSuccess)
+        {
+            Mostrar("Usuario creado exitosamente.", false);
+            _nuevoUsuario = new UsuarioCommandDto { Nombre = string.Empty };
+            await CargarAsync();
+        }
+        else
+        {
+            Mostrar(result.Error.Mensaje, true);
+        }
     }
 
-    private void Eliminar(Guid usuarioId) => Ejecutar(
-        () => UsuarioService.EliminarUsuario(usuarioId),
-        "Usuario eliminado.",
-        "No se encontró el usuario.");
-
-    private void Ejecutar(Func<bool> accion, string mensajeOk, string mensajeError)
+    private async Task EliminarAsync(Guid usuarioId)
     {
-        try
+        var result = await UsuarioService.EliminarUsuarioAsync(usuarioId);
+        if (result.IsSuccess)
         {
-            var correcto = accion();
-            Mostrar(correcto ? mensajeOk : mensajeError, !correcto);
-            if (correcto)
-            {
-                Cargar();
-            }
+            Mostrar("Usuario eliminado exitosamente.", false);
+            await CargarAsync();
         }
-        catch (Exception ex)
+        else
         {
-            Mostrar($"La operación falló: {ex.Message}", true);
+            Mostrar(result.Error.Mensaje, true);
         }
     }
 

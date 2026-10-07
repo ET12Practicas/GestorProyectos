@@ -7,19 +7,30 @@ public sealed class UsuarioEndpoints : ICarterModule
 {
     public void AddRoutes(IEndpointRouteBuilder app)
     {
-        var usuarios = app.MapGroup("/api/usuario").WithTags("Usuarios");
+        var group = app.MapGroup("/api/usuarios").WithTags("Usuarios");
 
-        usuarios.MapGet("/", (IUsuarioService service) =>
-            Results.Ok(service.ObtenerUsuarios()));
+        group.MapGet("/", async (IUsuarioService service, CancellationToken ct) =>
+        {
+            var usuarios = await service.ObtenerUsuariosAsync(ct);
+            return Results.Ok(usuarios);
+        });
 
-        usuarios.MapPost("/", (IUsuarioService service, UsuarioCommandDto dto) =>
-            service.CrearUsuario(dto)
-                ? Results.Created("/api/usuario", null)
-                : Results.BadRequest("El nombre del usuario es obligatorio."));
+        group.MapGet("/{usuarioId:guid}", async (IUsuarioService service, Guid usuarioId, CancellationToken ct) =>
+        {
+            var usuario = await service.ObtenerUsuarioPorIdAsync(usuarioId, ct);
+            return usuario is not null ? Results.Ok(usuario) : Results.NotFound();
+        });
 
-        usuarios.MapDelete("/{usuarioId:guid}", (IUsuarioService service, Guid usuarioId) =>
-            service.EliminarUsuario(usuarioId)
-                ? Results.NoContent()
-                : Results.NotFound());
+        group.MapPost("/", async (IUsuarioService service, UsuarioCommandDto dto, CancellationToken ct) =>
+        {
+            var result = await service.CrearUsuarioAsync(dto, ct);
+            return result.ToHttpResult($"/api/usuarios/{result.Value}");
+        });
+
+        group.MapDelete("/{usuarioId:guid}", async (IUsuarioService service, Guid usuarioId, CancellationToken ct) =>
+        {
+            var result = await service.EliminarUsuarioAsync(usuarioId, ct);
+            return result.ToHttpResult();
+        });
     }
 }

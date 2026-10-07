@@ -11,7 +11,7 @@
         <h1>Tickets</h1>
         <p>Asigná responsables, actualizá estados y mantené el tablero al día.</p>
     </div>
-    <button class="btn btn-outline-primary" @onclick="Cargar">Actualizar</button>
+    <button class="btn btn-outline-primary" @onclick="CargarAsync">Actualizar</button>
 </div>
 
 @if (_mensaje is not null)
@@ -54,14 +54,20 @@ else
                     var usuarios = UsuariosDelTicket(ticket.Id);
 
                     <tr>
-                        <td class="fw-semibold">@ticket.Nombre</td>
+                        <td class="fw-semibold">
+                            <div>@ticket.Nombre</div>
+                            @if (!string.IsNullOrWhiteSpace(ticket.Descripcion))
+                            {
+                                <small class="text-secondary fw-normal d-block">@ticket.Descripcion</small>
+                            }
+                        </td>
                         <td>@NombreProyecto(ticket.Id)</td>
                         <td>
                             <select class="form-select form-select-sm responsable-select"
                                     value="@(ticket.Usuario?.Id.ToString() ?? string.Empty)"
                                     disabled="@(usuarios.Count == 0)"
                                     aria-label="Responsable de @ticket.Nombre"
-                                    @onchange="args => AsignarUsuario(ticket.Id, args.Value?.ToString())">
+                                    @onchange="args => AsignarUsuarioAsync(ticket.Id, args.Value?.ToString())">
                                 @if (usuarios.Count == 0)
                                 {
                                     <option value="">Sin usuarios en el proyecto</option>
@@ -81,7 +87,7 @@ else
                             <select class="form-select form-select-sm status-select"
                                     value="@ticket.Estado"
                                     aria-label="Estado de @ticket.Nombre"
-                                    @onchange="args => CambiarEstado(ticket.Id, args.Value?.ToString())">
+                                    @onchange="args => CambiarEstadoAsync(ticket.Id, args.Value?.ToString())">
                                 @foreach (var estado in Enum.GetValues<EEstadoTicket>())
                                 {
                                     <option value="@estado">@TextoEstado(estado)</option>
@@ -89,7 +95,7 @@ else
                             </select>
                         </td>
                         <td class="text-end">
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Eliminar(ticket.Id)">
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(ticket.Id)">
                                 Eliminar
                             </button>
                         </td>
@@ -107,16 +113,16 @@ else
     private bool _esError;
     private string? _mensaje;
 
-    protected override void OnInitialized() => Cargar();
+    protected override async Task OnInitializedAsync() => await CargarAsync();
 
-    private void Cargar()
+    private async Task CargarAsync()
     {
         _cargando = true;
 
         try
         {
-            _tickets = TicketService.ObtenerTickets();
-            _proyectos = ProyectoService.ObtenerProyectos();
+            _tickets = await TicketService.ObtenerTicketsAsync();
+            _proyectos = await ProyectoService.ObtenerProyectosAsync();
         }
         catch (Exception ex)
         {
@@ -138,7 +144,7 @@ else
         _proyectos.FirstOrDefault(proyecto =>
             proyecto.Tickets.Any(ticket => ticket.Id == ticketId));
 
-    private void AsignarUsuario(Guid ticketId, string? valor)
+    private async Task AsignarUsuarioAsync(Guid ticketId, string? valor)
     {
         if (!Guid.TryParse(valor, out var usuarioId))
         {
@@ -146,13 +152,19 @@ else
             return;
         }
 
-        Ejecutar(
-            () => ProyectoService.AsignarUsuarioATicket(ticketId, usuarioId),
-            "Responsable asignado.",
-            "El usuario debe pertenecer al mismo proyecto que el ticket.");
+        var result = await TicketService.AsignarUsuarioATicketAsync(ticketId, usuarioId);
+        if (result.IsSuccess)
+        {
+            Mostrar("Responsable asignado exitosamente.", false);
+            await CargarAsync();
+        }
+        else
+        {
+            Mostrar(result.Error.Mensaje, true);
+        }
     }
 
-    private void CambiarEstado(Guid ticketId, string? valor)
+    private async Task CambiarEstadoAsync(Guid ticketId, string? valor)
     {
         if (!Enum.TryParse<EEstadoTicket>(valor, out var estado))
         {
@@ -160,34 +172,29 @@ else
             return;
         }
 
-        Ejecutar(
-            () => ProyectoService.CambiarEstadoTicket(
-                ticketId,
-                new EstadoTicketDto { Estado = estado }),
-            "Estado actualizado.",
-            "No se pudo actualizar el estado.");
+        var result = await TicketService.CambiarEstadoTicketAsync(ticketId, new EstadoTicketDto { Estado = estado });
+        if (result.IsSuccess)
+        {
+            Mostrar("Estado actualizado exitosamente.", false);
+            await CargarAsync();
+        }
+        else
+        {
+            Mostrar(result.Error.Mensaje, true);
+        }
     }
 
-    private void Eliminar(Guid ticketId) => Ejecutar(
-        () => ProyectoService.EliminarTicket(ticketId),
-        "Ticket eliminado.",
-        "No se encontró el ticket.");
-
-    private void Ejecutar(Func<bool> accion, string mensajeOk, string mensajeError)
+    private async Task EliminarAsync(Guid ticketId)
     {
-        try
+        var result = await TicketService.EliminarTicketAsync(ticketId);
+        if (result.IsSuccess)
         {
-            var correcto = accion();
-            Mostrar(correcto ? mensajeOk : mensajeError, !correcto);
-
-            if (correcto)
-            {
-                Cargar();
-            }
+            Mostrar("Ticket eliminado exitosamente.", false);
+            await CargarAsync();
         }
-        catch (Exception ex)
+        else
         {
-            Mostrar($"La operación falló: {ex.Message}", true);
+            Mostrar(result.Error.Mensaje, true);
         }
     }
 

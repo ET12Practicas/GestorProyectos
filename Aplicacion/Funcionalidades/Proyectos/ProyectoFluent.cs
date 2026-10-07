@@ -1,18 +1,13 @@
 using FluentValidation;
-using Aplicacion.Dominio;
 
-namespace Aplicacion.Funcionalidades.Proyectos
+namespace Aplicacion.Funcionalidades.Proyectos;
+
+public class ProyectoCommandDtoValidator : AbstractValidator<ProyectoCommandDto>
 {
-    public class ProyectoFluent : AbstractValidator<Proyecto>
+    public ProyectoCommandDtoValidator()
     {
-        public ProyectoFluent()
-        {
-            RuleFor(x => x.IdProject)
-                .NotEmpty().WithMessage("Id no detectado.");
-            
-            RuleFor(x => x.Nombre)
-                .NotEmpty().WithMessage("El proyecto debe tener un nombre")
-                .MaximumLength(45).WithMessage("El nombre del proyecto no debe pasar los 45 caracteres.");
-        }
+        RuleFor(x => x.Nombre)
+            .NotEmpty().WithMessage("El nombre del proyecto es obligatorio.")
+            .MaximumLength(45).WithMessage("El nombre del proyecto no debe superar los 45 caracteres.");
     }
 }

@@ -10,7 +10,7 @@
         <h1>Comentarios</h1>
         <p>Consultá los aportes realizados en los tickets.</p>
     </div>
-    <button class="btn btn-outline-primary" @onclick="Cargar">Actualizar</button>
+    <button class="btn btn-outline-primary" @onclick="CargarAsync">Actualizar</button>
 </div>
 
 @if (_error is not null)
@@ -46,16 +46,16 @@ else
     private bool _cargando;
     private string? _error;
 
-    protected override void OnInitialized() => Cargar();
+    protected override async Task OnInitializedAsync() => await CargarAsync();
 
-    private void Cargar()
+    private async Task CargarAsync()
     {
         _cargando = true;
         _error = null;
 
         try
         {
-            _comentarios = ComentarioService.ObtenerComentarios();
+            _comentarios = await ComentarioService.ObtenerComentariosAsync();
         }
         catch (Exception ex)
         {

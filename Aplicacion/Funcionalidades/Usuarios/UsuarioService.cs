@@ -1,47 +1,62 @@
 using Aplicacion.Abstracciones;
+using Aplicacion.Comun;
 using Aplicacion.Dominio;
+using FluentValidation;
 
 namespace Aplicacion.Funcionalidades.Usuarios;
 
 public interface IUsuarioService
 {
-    IReadOnlyList<UsuarioQueryDto> ObtenerUsuarios();
-    bool CrearUsuario(UsuarioCommandDto dto);
-    bool EliminarUsuario(Guid usuarioId);
+    Task<IReadOnlyList<UsuarioQueryDto>> ObtenerUsuariosAsync(CancellationToken cancellationToken = default);
+    Task<UsuarioQueryDto?> ObtenerUsuarioPorIdAsync(Guid usuarioId, CancellationToken cancellationToken = default);
+    Task<Result<Guid>> CrearUsuarioAsync(UsuarioCommandDto dto, CancellationToken cancellationToken = default);
+    Task<Result> EliminarUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default);
 }
 
 internal sealed class UsuarioService(
     IUsuarioRepository usuarioRepository,
-    IUnidadDeTrabajo unidadDeTrabajo) : IUsuarioService
+    IUnidadDeTrabajo unidadDeTrabajo,
+    IValidator<UsuarioCommandDto> validator) : IUsuarioService
 {
-    public IReadOnlyList<UsuarioQueryDto> ObtenerUsuarios()
+    public async Task<IReadOnlyList<UsuarioQueryDto>> ObtenerUsuariosAsync(CancellationToken cancellationToken = default)
     {
-        return usuarioRepository.ObtenerUsuarios().Select(MapearUsuario).ToList();
+        var usuarios = await usuarioRepository.ObtenerUsuariosAsync(cancellationToken);
+        return usuarios.Select(MapearUsuario).ToList();
     }
 
-    public bool CrearUsuario(UsuarioCommandDto dto)
+    public async Task<UsuarioQueryDto?> ObtenerUsuarioPorIdAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(dto.Nombre))
+        var usuario = await usuarioRepository.ObtenerUsuarioAsync(usuarioId, cancellationToken);
+        return usuario is null ? null : MapearUsuario(usuario);
+    }
+
+    public async Task<Result<Guid>> CrearUsuarioAsync(UsuarioCommandDto dto, CancellationToken cancellationToken = default)
+    {
+        var validacion = await validator.ValidateAsync(dto, cancellationToken);
+        if (!validacion.IsValid)
         {
-            return false;
+            var primerError = validacion.Errors[0].ErrorMessage;
+            return Result.Failure<Guid>(Error.Validation(primerError));
         }
 
-        usuarioRepository.AgregarUsuario(new Usuario(dto.Nombre.Trim()));
-        unidadDeTrabajo.GuardarCambios();
-        return true;
+        var usuario = new Usuario(dto.Nombre.Trim());
+        usuarioRepository.AgregarUsuario(usuario);
+        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
+
+        return Result.Success(usuario.Id);
     }
 
-    public bool EliminarUsuario(Guid usuarioId)
+    public async Task<Result> EliminarUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
-        var usuario = usuarioRepository.ObtenerUsuario(usuarioId);
+        var usuario = await usuarioRepository.ObtenerUsuarioAsync(usuarioId, cancellationToken);
         if (usuario is null)
         {
-            return false;
+            return Result.Failure(Error.NotFound("Usuario no encontrado."));
         }
 
         usuarioRepository.EliminarUsuario(usuario);
-        unidadDeTrabajo.GuardarCambios();
-        return true;
+        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
+        return Result.Success();
     }
 
     internal static UsuarioQueryDto MapearUsuario(Usuario usuario)

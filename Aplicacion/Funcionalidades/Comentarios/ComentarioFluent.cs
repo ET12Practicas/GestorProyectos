@@ -1,24 +1,13 @@
-
 using FluentValidation;
-using Aplicacion.Dominio;
 
-namespace Aplicacion.Funcionalidades.Comentarios
+namespace Aplicacion.Funcionalidades.Comentarios;
+
+public class ComentarioCommandDtoValidator : AbstractValidator<ComentarioCommandDto>
 {
-    public class ComentarioFluent : AbstractValidator<Comentario>
+    public ComentarioCommandDtoValidator()
     {
-        public ComentarioFluent()
-        {
-            RuleFor(x => x.IdComentario)
-                .NotEmpty()
-                .WithMessage("Id no detectado.");
-
-            RuleFor(x => x.FechaComentario)
-                .NotEmpty()
-                .WithMessage("Fecha no ingresada.");
-
-            RuleFor(x => x.Contenido)
-                .NotEmpty()
-                .WithMessage("El comentario no puede estar vacio.");
-        }
+        RuleFor(x => x.Contenido)
+            .NotEmpty().WithMessage("El comentario no puede estar vacío.")
+            .MaximumLength(2000).WithMessage("El comentario no puede superar los 2000 caracteres.");
     }
 }
