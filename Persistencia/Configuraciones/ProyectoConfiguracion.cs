@@ -15,6 +15,11 @@ public sealed class ProyectoConfiguracion : IEntityTypeConfiguration<Proyecto>
             .IsRequired()
             .HasMaxLength(45);
 
+        builder.HasOne(p => p.Creador)
+            .WithMany(u => u.ProyectosCreados)
+            .HasForeignKey(p => p.CreadorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(p => p.Usuarios)
             .WithMany(u => u.Proyectos)
             .UsingEntity(join => join.ToTable("ProyectoUsuario"));

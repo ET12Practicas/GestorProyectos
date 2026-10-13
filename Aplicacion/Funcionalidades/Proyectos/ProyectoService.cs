@@ -10,6 +10,7 @@ namespace Aplicacion.Funcionalidades.Proyectos;
 public interface IProyectoService
 {
     Task<IReadOnlyList<ProyectoQueryDto>> ObtenerProyectosAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ProyectoQueryDto>> ObtenerProyectosDelUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default);
     Task<ProyectoQueryDto?> ObtenerProyectoPorIdAsync(Guid proyectoId, CancellationToken cancellationToken = default);
     Task<Result<Guid>> CrearProyectoAsync(ProyectoCommandDto dto, CancellationToken cancellationToken = default);
     Task<Result> AsignarUsuarioAProyectoAsync(Guid proyectoId, Guid usuarioId, CancellationToken cancellationToken = default);
@@ -29,6 +30,12 @@ internal sealed class ProyectoService(
         return proyectos.Select(MapearProyecto).ToList();
     }
 
+    public async Task<IReadOnlyList<ProyectoQueryDto>> ObtenerProyectosDelUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
+    {
+        var proyectos = await proyectoRepository.ObtenerProyectosDelUsuarioAsync(usuarioId, cancellationToken);
+        return proyectos.Select(MapearProyecto).ToList();
+    }
+
     public async Task<ProyectoQueryDto?> ObtenerProyectoPorIdAsync(Guid proyectoId, CancellationToken cancellationToken = default)
     {
         var proyecto = await proyectoRepository.ObtenerProyectoAsync(proyectoId, cancellationToken);
@@ -44,7 +51,16 @@ internal sealed class ProyectoService(
             return Result.Failure<Guid>(Error.Validation(primerError));
         }
 
-        var proyecto = new Proyecto(dto.Nombre.Trim());
+        var proyecto = new Proyecto(dto.Nombre.Trim(), dto.CreadorId);
+        if (dto.CreadorId.HasValue)
+        {
+            var creador = await usuarioRepository.ObtenerUsuarioAsync(dto.CreadorId.Value, cancellationToken);
+            if (creador is not null)
+            {
+                proyecto.Usuarios.Add(creador);
+            }
+        }
+
         proyectoRepository.AgregarProyecto(proyecto);
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
 
@@ -120,6 +136,8 @@ internal sealed class ProyectoService(
         {
             Id = proyecto.Id,
             Nombre = proyecto.Nombre,
+            CreadorId = proyecto.CreadorId,
+            Creador = proyecto.Creador is null ? null : UsuarioService.MapearUsuario(proyecto.Creador),
             Tickets = proyecto.Tickets.Select(TicketService.MapearTicket).ToList(),
             Usuarios = proyecto.Usuarios.Select(UsuarioService.MapearUsuario).ToList()
         };

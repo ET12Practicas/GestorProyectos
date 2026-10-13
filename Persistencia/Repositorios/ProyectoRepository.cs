@@ -11,6 +11,7 @@ internal sealed class ProyectoRepository(ProyectoDbContext context) : IProyectoR
         return await context.Proyectos
             .AsNoTracking()
             .AsSplitQuery()
+            .Include(proyecto => proyecto.Creador)
             .Include(proyecto => proyecto.Usuarios)
             .Include(proyecto => proyecto.Tickets)
                 .ThenInclude(ticket => ticket.UsuarioTicket)
@@ -23,6 +24,7 @@ internal sealed class ProyectoRepository(ProyectoDbContext context) : IProyectoR
     public async Task<Proyecto?> ObtenerProyectoAsync(Guid proyectoId, CancellationToken cancellationToken = default)
     {
         return await context.Proyectos
+            .Include(proyecto => proyecto.Creador)
             .Include(proyecto => proyecto.Usuarios)
             .Include(proyecto => proyecto.Tickets)
             .FirstOrDefaultAsync(proyecto => proyecto.Id == proyectoId, cancellationToken);
@@ -31,8 +33,9 @@ internal sealed class ProyectoRepository(ProyectoDbContext context) : IProyectoR
     public async Task<IReadOnlyList<Proyecto>> ObtenerProyectosDelUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
         return await context.Proyectos
+            .Include(proyecto => proyecto.Creador)
             .Include(proyecto => proyecto.Usuarios)
-            .Where(proyecto => proyecto.Usuarios.Any(usuario => usuario.Id == usuarioId))
+            .Where(proyecto => proyecto.CreadorId == usuarioId || proyecto.Usuarios.Any(usuario => usuario.Id == usuarioId))
             .ToListAsync(cancellationToken);
     }
 

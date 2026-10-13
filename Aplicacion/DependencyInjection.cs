@@ -1,3 +1,4 @@
+using Aplicacion.Funcionalidades.Auth;
 using Aplicacion.Funcionalidades.Comentarios;
 using Aplicacion.Funcionalidades.Proyectos;
 using Aplicacion.Funcionalidades.Tickets;
@@ -15,6 +16,8 @@ public static class DependencyInjection
         services.AddScoped<IValidator<TicketCommandDto>, TicketCommandDtoValidator>();
         services.AddScoped<IValidator<ComentarioCommandDto>, ComentarioCommandDtoValidator>();
         services.AddScoped<IValidator<UsuarioCommandDto>, UsuarioCommandDtoValidator>();
+        services.AddScoped<IValidator<RegistroUsuarioDto>, RegistroUsuarioDtoValidator>();
+        services.AddScoped<IValidator<LoginUsuarioDto>, LoginUsuarioDtoValidator>();
 
         services.AddScoped<IComentarioService, ComentarioService>();
         services.AddScoped<IProyectoService, ProyectoService>();
