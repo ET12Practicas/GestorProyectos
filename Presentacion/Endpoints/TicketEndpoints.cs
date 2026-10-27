@@ -30,7 +30,7 @@ public sealed class TicketEndpoints : ICarterModule
         {
             var result = await service.CambiarEstadoTicketAsync(ticketId, dto, ct);
             return result.ToHttpResult();
-        });
+        }).RequireAuthorization();
 
         group.MapPut("/{ticketId:guid}/usuario/{usuarioId:guid}", async (
             ITicketService service,
@@ -40,7 +40,7 @@ public sealed class TicketEndpoints : ICarterModule
         {
             var result = await service.AsignarUsuarioATicketAsync(ticketId, usuarioId, ct);
             return result.ToHttpResult();
-        });
+        }).RequireAuthorization();
 
         group.MapDelete("/{ticketId:guid}/usuario", async (
             ITicketService service,
@@ -49,7 +49,7 @@ public sealed class TicketEndpoints : ICarterModule
         {
             var result = await service.DesasignarUsuarioDeTicketAsync(ticketId, ct);
             return result.ToHttpResult();
-        });
+        }).RequireAuthorization();
 
         group.MapDelete("/{ticketId:guid}", async (
             ITicketService service,
@@ -58,7 +58,7 @@ public sealed class TicketEndpoints : ICarterModule
         {
             var result = await service.EliminarTicketAsync(ticketId, ct);
             return result.ToHttpResult();
-        });
+        }).RequireAuthorization();
 
         // Sub-recursos de comentarios del ticket
         group.MapGet("/{ticketId:guid}/comentarios", async (
@@ -79,6 +79,6 @@ public sealed class TicketEndpoints : ICarterModule
         {
             var result = await comentarioService.CrearComentarioAsync(ticketId, usuarioId, dto, ct);
             return result.ToHttpResult($"/api/comentarios/{result.Value}");
-        });
+        }).RequireAuthorization();
     }
 }

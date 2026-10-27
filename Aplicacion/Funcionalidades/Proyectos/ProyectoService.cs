@@ -22,7 +22,8 @@ internal sealed class ProyectoService(
     IProyectoRepository proyectoRepository,
     IUsuarioRepository usuarioRepository,
     IUnidadDeTrabajo unidadDeTrabajo,
-    IValidator<ProyectoCommandDto> validator) : IProyectoService
+    IValidator<ProyectoCommandDto> validator,
+    ICurrentUserService currentUserService) : IProyectoService
 {
     public async Task<IReadOnlyList<ProyectoQueryDto>> ObtenerProyectosAsync(CancellationToken cancellationToken = default)
     {
@@ -51,14 +52,17 @@ internal sealed class ProyectoService(
             return Result.Failure<Guid>(Error.Validation(primerError));
         }
 
-        var proyecto = new Proyecto(dto.Nombre.Trim(), dto.CreadorId);
-        if (dto.CreadorId.HasValue)
+        var creadorId = dto.CreadorId ?? currentUserService.UsuarioId;
+        if (!creadorId.HasValue)
         {
-            var creador = await usuarioRepository.ObtenerUsuarioAsync(dto.CreadorId.Value, cancellationToken);
-            if (creador is not null)
-            {
-                proyecto.Usuarios.Add(creador);
-            }
+            return Result.Failure<Guid>(Error.Unauthorized("Debes iniciar sesión para crear un proyecto."));
+        }
+
+        var proyecto = new Proyecto(dto.Nombre.Trim(), creadorId.Value);
+        var creador = await usuarioRepository.ObtenerUsuarioAsync(creadorId.Value, cancellationToken);
+        if (creador is not null)
+        {
+            proyecto.Usuarios.Add(creador);
         }
 
         proyectoRepository.AgregarProyecto(proyecto);
@@ -73,6 +77,14 @@ internal sealed class ProyectoService(
         if (proyecto is null)
         {
             return Result.Failure(Error.NotFound("Proyecto no encontrado."));
+        }
+
+        // Regla: Solo el creador del proyecto puede asignar nuevos usuarios
+        if (currentUserService.IsAuthenticated &&
+            proyecto.CreadorId.HasValue &&
+            currentUserService.UsuarioId != proyecto.CreadorId)
+        {
+            return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede asignar usuarios a este proyecto."));
         }
 
         var usuario = await usuarioRepository.ObtenerUsuarioAsync(usuarioId, cancellationToken);
@@ -99,6 +111,15 @@ internal sealed class ProyectoService(
             return Result.Failure(Error.NotFound("Proyecto no encontrado."));
         }
 
+        // Regla: Solo el creador del proyecto puede quitar usuarios (o el mismo usuario saliendo)
+        if (currentUserService.IsAuthenticated &&
+            proyecto.CreadorId.HasValue &&
+            currentUserService.UsuarioId != proyecto.CreadorId &&
+            currentUserService.UsuarioId != usuarioId)
+        {
+            return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede quitar colaboradores."));
+        }
+
         var usuario = proyecto.Usuarios.FirstOrDefault(u => u.Id == usuarioId);
         if (usuario is null)
         {
@@ -123,6 +144,14 @@ internal sealed class ProyectoService(
         if (proyecto is null)
         {
             return Result.Failure(Error.NotFound("Proyecto no encontrado."));
+        }
+
+        // Regla: Solo el creador del proyecto puede eliminarlo
+        if (currentUserService.IsAuthenticated &&
+            proyecto.CreadorId.HasValue &&
+            currentUserService.UsuarioId != proyecto.CreadorId)
+        {
+            return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede eliminarlo."));
         }
 
         proyectoRepository.EliminarProyecto(proyecto);

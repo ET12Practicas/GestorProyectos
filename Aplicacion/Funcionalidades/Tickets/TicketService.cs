@@ -25,7 +25,8 @@ internal sealed class TicketService(
     IProyectoRepository proyectoRepository,
     IUsuarioRepository usuarioRepository,
     IUnidadDeTrabajo unidadDeTrabajo,
-    IValidator<TicketCommandDto> validator) : ITicketService
+    IValidator<TicketCommandDto> validator,
+    ICurrentUserService currentUserService) : ITicketService
 {
     public async Task<IReadOnlyList<TicketQueryDto>> ObtenerTicketsAsync(CancellationToken cancellationToken = default)
     {
@@ -58,6 +59,15 @@ internal sealed class TicketService(
         if (proyecto is null)
         {
             return Result.Failure<Guid>(Error.NotFound("Proyecto no encontrado."));
+        }
+
+        // Regla: Solo el creador o miembros del proyecto pueden crear tickets
+        if (currentUserService.IsAuthenticated &&
+            proyecto.CreadorId.HasValue &&
+            currentUserService.UsuarioId != proyecto.CreadorId &&
+            !proyecto.Usuarios.Any(u => u.Id == currentUserService.UsuarioId))
+        {
+            return Result.Failure<Guid>(Error.Forbidden("Solo el creador o miembros del proyecto pueden crear tickets en él."));
         }
 
         var ticket = new Ticket(dto.Nombre.Trim(), dto.Descripcion?.Trim() ?? string.Empty)

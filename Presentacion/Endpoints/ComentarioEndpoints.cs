@@ -22,6 +22,6 @@ public sealed class ComentarioEndpoints : ICarterModule
         {
             var result = await service.EliminarComentarioAsync(comentarioId, ct);
             return result.ToHttpResult();
-        });
+        }).RequireAuthorization();
     }
 }

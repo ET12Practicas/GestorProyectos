@@ -18,9 +18,16 @@ public static class ResultExtensions
     {
         if (result.IsSuccess)
         {
-            return string.IsNullOrEmpty(createdUri)
-                ? Results.Ok(result.Value)
-                : Results.Created(createdUri, new { id = result.Value });
+            if (string.IsNullOrEmpty(createdUri))
+            {
+                return Results.Ok(result.Value);
+            }
+
+            var body = result.Value is Guid or string or int
+                ? (object)new { id = result.Value }
+                : result.Value;
+
+            return Results.Created(createdUri, body);
         }
 
         return MapError(result.Error);
@@ -30,6 +37,8 @@ public static class ResultExtensions
     {
         "NotFound" => Results.NotFound(new { error = error.Mensaje }),
         "Conflict" => Results.Conflict(new { error = error.Mensaje }),
+        "Unauthorized" => Results.Json(new { error = error.Mensaje }, statusCode: StatusCodes.Status401Unauthorized),
+        "Forbidden" => Results.Json(new { error = error.Mensaje }, statusCode: StatusCodes.Status403Forbidden),
         _ => Results.BadRequest(new { error = error.Mensaje })
     };
 }

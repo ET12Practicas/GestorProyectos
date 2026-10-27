@@ -6,6 +6,8 @@ public sealed record Error(string Codigo, string Mensaje)
     public static Error NotFound(string mensaje = "Recurso no encontrado.") => new("NotFound", mensaje);
     public static Error Validation(string mensaje = "Error de validación.") => new("Validation", mensaje);
     public static Error Conflict(string mensaje = "Conflicto con el estado actual.") => new("Conflict", mensaje);
+    public static Error Unauthorized(string mensaje = "No autorizado.") => new("Unauthorized", mensaje);
+    public static Error Forbidden(string mensaje = "Acceso denegado.") => new("Forbidden", mensaje);
     public static Error Failure(string mensaje = "Operación fallida.") => new("Failure", mensaje);
 }
 
