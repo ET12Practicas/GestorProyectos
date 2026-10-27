@@ -1,7 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Aplicacion.Dominio;
+using Dominio.Entidades;
 using Aplicacion.Funcionalidades.Auth;
 using Microsoft.IdentityModel.Tokens;
 

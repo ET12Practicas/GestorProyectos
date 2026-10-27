@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Aplicacion;
 using Aplicacion.Abstracciones;
-using Aplicacion.Dominio;
+using Dominio.Entidades;
 using Aplicacion.Funcionalidades.Auth;
 using Carter;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

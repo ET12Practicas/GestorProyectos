@@ -1,6 +1,6 @@
-using Aplicacion.Enums;
+using Dominio.Enums;
 
-namespace Aplicacion.Dominio;
+namespace Dominio.Entidades;
 
 public class Ticket
 {

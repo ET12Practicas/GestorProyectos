@@ -1,4 +1,4 @@
-namespace Aplicacion.Dominio;
+namespace Dominio.Entidades;
 
 public class Comentario
 {

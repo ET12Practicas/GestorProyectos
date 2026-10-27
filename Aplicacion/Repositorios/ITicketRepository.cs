@@ -1,4 +1,4 @@
-using Aplicacion.Dominio;
+using Dominio.Entidades;
 
 namespace Aplicacion.Abstracciones;
 

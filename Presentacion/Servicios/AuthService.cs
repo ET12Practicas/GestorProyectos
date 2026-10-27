@@ -1,5 +1,5 @@
 using Aplicacion.Comun;
-using Aplicacion.Dominio;
+using Dominio.Entidades;
 using Aplicacion.Funcionalidades.Auth;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;

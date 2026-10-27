@@ -1,7 +1,7 @@
 using Aplicacion.Abstracciones;
 using Aplicacion.Comun;
-using Aplicacion.Dominio;
-using Aplicacion.Enums;
+using Dominio.Entidades;
+using Dominio.Enums;
 using Aplicacion.Funcionalidades.Comentarios;
 using Aplicacion.Funcionalidades.Usuarios;
 using FluentValidation;

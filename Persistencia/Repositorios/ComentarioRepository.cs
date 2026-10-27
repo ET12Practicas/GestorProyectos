@@ -1,5 +1,5 @@
 using Aplicacion.Abstracciones;
-using Aplicacion.Dominio;
+using Dominio.Entidades;
 using Microsoft.EntityFrameworkCore;
 
 namespace Persistencia;

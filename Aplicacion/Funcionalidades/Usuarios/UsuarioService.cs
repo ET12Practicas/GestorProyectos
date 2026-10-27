@@ -1,6 +1,6 @@
 using Aplicacion.Abstracciones;
 using Aplicacion.Comun;
-using Aplicacion.Dominio;
+using Dominio.Entidades;
 using FluentValidation;
 
 namespace Aplicacion.Funcionalidades.Usuarios;

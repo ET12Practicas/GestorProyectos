@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using Aplicacion.Abstracciones;
-using Aplicacion.Dominio;
+using Dominio.Entidades;
 using Aplicacion.Funcionalidades.Proyectos;
 using Aplicacion.Funcionalidades.Tickets;
 using Carter;

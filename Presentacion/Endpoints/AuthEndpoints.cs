@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using Aplicacion.Comun;
-using Aplicacion.Dominio;
+using Dominio.Entidades;
 using Aplicacion.Funcionalidades.Auth;
 using Carter;
 using FluentValidation;

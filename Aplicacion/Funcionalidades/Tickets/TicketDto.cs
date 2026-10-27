@@ -1,4 +1,4 @@
-using Aplicacion.Enums;
+using Dominio.Enums;
 using Aplicacion.Funcionalidades.Comentarios;
 using Aplicacion.Funcionalidades.Usuarios;
 
