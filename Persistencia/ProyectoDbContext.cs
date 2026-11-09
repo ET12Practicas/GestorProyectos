@@ -26,6 +26,9 @@ public sealed class ProyectoDbContext : IdentityDbContext<Usuario, IdentityRole<
         var user2Id = Guid.Parse("10000000-0000-0000-0000-000000000002");
         var user3Id = Guid.Parse("10000000-0000-0000-0000-000000000003");
 
+        var hasher = new PasswordHasher<Usuario>();
+        var defaultPasswordHash = hasher.HashPassword(null!, "Password123!");
+
         modelBuilder.Entity<Usuario>().HasData(
             new Usuario("User_1")
             {
@@ -35,6 +38,7 @@ public sealed class ProyectoDbContext : IdentityDbContext<Usuario, IdentityRole<
                 Email = "user1@demo.com",
                 NormalizedEmail = "USER1@DEMO.COM",
                 EmailConfirmed = true,
+                PasswordHash = defaultPasswordHash,
                 SecurityStamp = "10000000-0000-0000-0000-000000000001",
                 ConcurrencyStamp = "10000000-0000-0000-0000-000000000001"
             },
@@ -46,6 +50,7 @@ public sealed class ProyectoDbContext : IdentityDbContext<Usuario, IdentityRole<
                 Email = "user2@demo.com",
                 NormalizedEmail = "USER2@DEMO.COM",
                 EmailConfirmed = true,
+                PasswordHash = defaultPasswordHash,
                 SecurityStamp = "10000000-0000-0000-0000-000000000002",
                 ConcurrencyStamp = "10000000-0000-0000-0000-000000000002"
             },
@@ -57,6 +62,7 @@ public sealed class ProyectoDbContext : IdentityDbContext<Usuario, IdentityRole<
                 Email = "user3@demo.com",
                 NormalizedEmail = "USER3@DEMO.COM",
                 EmailConfirmed = true,
+                PasswordHash = defaultPasswordHash,
                 SecurityStamp = "10000000-0000-0000-0000-000000000003",
                 ConcurrencyStamp = "10000000-0000-0000-0000-000000000003"
             }
