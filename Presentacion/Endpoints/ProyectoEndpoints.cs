@@ -18,7 +18,7 @@ public sealed class ProyectoEndpoints : ICarterModule
         {
             var proyectos = await service.ObtenerProyectosAsync(ct);
             return Results.Ok(proyectos);
-        });
+        }).RequireAuthorization();
 
         group.MapGet("/mis-proyectos", async (
             ICurrentUserService currentUser,
@@ -41,13 +41,13 @@ public sealed class ProyectoEndpoints : ICarterModule
         {
             var proyectos = await service.ObtenerProyectosDelUsuarioAsync(usuarioId, ct);
             return Results.Ok(proyectos);
-        });
+        }).RequireAuthorization();
 
         group.MapGet("/{proyectoId:guid}", async (IProyectoService service, Guid proyectoId, CancellationToken ct) =>
         {
             var proyecto = await service.ObtenerProyectoPorIdAsync(proyectoId, ct);
             return proyecto is not null ? Results.Ok(proyecto) : Results.NotFound();
-        });
+        }).RequireAuthorization();
 
         group.MapPost("/", async (
             IProyectoService service,
@@ -92,7 +92,7 @@ public sealed class ProyectoEndpoints : ICarterModule
         {
             var tickets = await ticketService.ObtenerTicketsPorProyectoAsync(proyectoId, ct);
             return Results.Ok(tickets);
-        });
+        }).RequireAuthorization();
 
         group.MapPost("/{proyectoId:guid}/tickets", async (
             ITicketService ticketService,

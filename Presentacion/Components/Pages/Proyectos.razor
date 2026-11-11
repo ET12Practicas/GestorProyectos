@@ -1,161 +1,190 @@
 @page "/proyectos"
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject IProyectoService ProyectoService
 @inject ITicketService TicketService
 @inject IUsuarioService UsuarioService
+@inject ICurrentUserService CurrentUserService
 
-<PageTitle>Proyectos</PageTitle>
+<PageTitle>Mis Proyectos - Gestor de Proyectos</PageTitle>
 
 <div class="page-heading">
     <div>
-        <span class="eyebrow">PLANIFICACIÓN</span>
-        <h1>Proyectos</h1>
-        <p>Creá proyectos, agregá tickets y sumá personas al equipo.</p>
+        <span class="eyebrow">WORKSPACE</span>
+        <h1>Mis Proyectos</h1>
+        <p>Proyectos creados por vos y proyectos a los que fuiste invitado.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary" @onclick="CargarAsync">↻ Actualizar</button>
+        <button class="btn btn-primary" @onclick="() => _mostrarModalProyecto = true">+ Nuevo Proyecto</button>
     </div>
 </div>
 
 @if (_mensaje is not null)
 {
-    <div class="alert @(_esError ? "alert-danger" : "alert-success")" role="alert">@_mensaje</div>
+    <div class="alert @(_esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+        @_mensaje
+        <button type="button" class="btn-close" @onclick="() => _mensaje = null"></button>
+    </div>
 }
-
-<div class="row g-4 mb-4">
-    <div class="col-lg-4">
-        <section class="content-card h-100">
-            <h2>Nuevo proyecto</h2>
-            <EditForm Model="_nuevoProyecto" OnValidSubmit="CrearProyectoAsync" FormName="crear-proyecto">
-                <div class="mb-3">
-                    <label class="form-label" for="nombre-proyecto">Nombre</label>
-                    <InputText id="nombre-proyecto" class="form-control" @bind-Value="_nuevoProyecto.Nombre" />
-                </div>
-                <button class="btn btn-primary w-100" type="submit">Crear proyecto</button>
-            </EditForm>
-        </section>
-    </div>
-
-    <div class="col-lg-4">
-        <section class="content-card h-100">
-            <h2>Nuevo ticket</h2>
-            <EditForm Model="_nuevoTicket" OnValidSubmit="CrearTicketAsync" FormName="crear-ticket">
-                <div class="mb-3">
-                    <label class="form-label" for="proyecto-ticket">Proyecto</label>
-                    <InputSelect id="proyecto-ticket" class="form-select" @bind-Value="_proyectoTicketId">
-                        <option value="@Guid.Empty">Seleccionar...</option>
-                        @foreach (var proyecto in _proyectos)
-                        {
-                            <option value="@proyecto.Id">@proyecto.Nombre</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label" for="nombre-ticket">Nombre</label>
-                    <InputText id="nombre-ticket" class="form-control" @bind-Value="_nuevoTicket.Nombre" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label" for="descripcion-ticket">Descripción</label>
-                    <InputTextArea id="descripcion-ticket" class="form-control" rows="2" @bind-Value="_nuevoTicket.Descripcion" />
-                </div>
-                <button class="btn btn-primary w-100" type="submit">Agregar ticket</button>
-            </EditForm>
-        </section>
-    </div>
-
-    <div class="col-lg-4">
-        <section class="content-card h-100">
-            <h2>Sumar usuario</h2>
-            <EditForm Model="_asignacion" OnValidSubmit="AsignarUsuarioAsync" FormName="asignar-usuario">
-                <div class="mb-3">
-                    <label class="form-label" for="proyecto-usuario">Proyecto</label>
-                    <InputSelect id="proyecto-usuario" class="form-select" @bind-Value="_asignacion.ProyectoId">
-                        <option value="@Guid.Empty">Seleccionar...</option>
-                        @foreach (var proyecto in _proyectos)
-                        {
-                            <option value="@proyecto.Id">@proyecto.Nombre</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label" for="usuario-proyecto">Usuario</label>
-                    <InputSelect id="usuario-proyecto" class="form-select" @bind-Value="_asignacion.UsuarioId">
-                        <option value="@Guid.Empty">Seleccionar...</option>
-                        @foreach (var usuario in _usuarios)
-                        {
-                            <option value="@usuario.Id">@usuario.Nombre</option>
-                        }
-                    </InputSelect>
-                </div>
-                <button class="btn btn-outline-primary w-100" type="submit">Asignar al proyecto</button>
-            </EditForm>
-        </section>
-    </div>
-</div>
 
 @if (_cargando)
 {
-    <p><em>Cargando proyectos...</em></p>
+    <div class="text-center my-5 py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="text-secondary mt-3">Cargando proyectos...</p>
+    </div>
 }
 else if (_proyectos.Count == 0)
 {
-    <div class="empty-state">Todavía no hay proyectos. Creá el primero para empezar.</div>
+    <div class="empty-state my-5 py-5">
+        <span class="display-4">📂</span>
+        <h3 class="mt-3">No tenés proyectos asignados todavía</h3>
+        <p class="text-secondary">Creá tu primer proyecto o pedile al creador de un equipo que te invite.</p>
+        <button class="btn btn-primary mt-2" @onclick="() => _mostrarModalProyecto = true">Crear Proyecto</button>
+    </div>
 }
 else
 {
     <div class="project-grid">
         @foreach (var proyecto in _proyectos)
         {
-            <article class="content-card project-card">
-                <div class="d-flex justify-content-between align-items-start gap-3">
-                    <div>
-                        <span class="eyebrow">PROYECTO</span>
-                        <h2 class="mb-1">@proyecto.Nombre</h2>
+            var esCreador = EsCreadorDelProyecto(proyecto);
+            var ticketsCerrados = proyecto.Tickets.Count(t => t.Estado == EEstadoTicket.Cerrado);
+            var totalTickets = proyecto.Tickets.Count;
+            var porcentaje = totalTickets == 0 ? 0 : (int)Math.Round((double)ticketsCerrados * 100 / totalTickets);
+
+            <article class="content-card project-card d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                        <span class="project-role-badge @(esCreador ? "role-owner" : "role-member")">
+                            @(esCreador ? "Dueño" : "Invitado")
+                        </span>
+                        <span class="count-pill">@totalTickets tickets</span>
                     </div>
-                    <span class="count-pill">@proyecto.Tickets.Count tickets</span>
+
+                    <h2 class="mb-2 fs-4 fw-bold">@proyecto.Nombre</h2>
+                    <p class="text-secondary small mb-3">
+                        Creador: <strong>@(proyecto.Creador?.Nombre ?? "Sistema")</strong>
+                    </p>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between small text-secondary mb-1">
+                            <span>Progreso</span>
+                            <span>@porcentaje%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-primary" style="width: @(porcentaje)%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small fw-semibold">EQUIPO (@proyecto.Usuarios.Count)</span>
+                            @if (esCreador)
+                            {
+                                <button class="btn btn-sm btn-link p-0 text-decoration-none" @onclick="() => AbrirModalSumarUsuario(proyecto)">
+                                    + Invitar
+                                </button>
+                            }
+
+                        </div>
+                        @if (proyecto.Usuarios.Count == 0)
+                        {
+                            <span class="text-muted small">Sin miembros aún.</span>
+                        }
+
+                        else
+                        {
+                            <div class="chip-list">
+                                @foreach (var usuario in proyecto.Usuarios)
+                                {
+                                    <span class="person-chip">@usuario.Nombre</span>
+                                }
+
+                            </div>
+                        }
+
+                    </div>
                 </div>
 
-                <div class="mt-4">
-                    <h3>Equipo</h3>
-                    @if (proyecto.Usuarios.Count == 0)
+                <div class="pt-3 border-top mt-3 d-flex justify-content-between align-items-center">
+                    <a href="tickets?proyectoId=@proyecto.Id" class="btn btn-outline-primary btn-sm px-3">
+                        Ver Tablero Kanban →
+                    </a>
+                    @if (esCreador)
                     {
-                        <p class="text-secondary">Sin usuarios asignados.</p>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarProyectoAsync(proyecto.Id)">
+                            Eliminar
+                        </button>
                     }
-                    else
-                    {
-                        <div class="chip-list">
-                            @foreach (var usuario in proyecto.Usuarios)
-                            {
-                                <span class="person-chip">@usuario.Nombre</span>
-                            }
-                        </div>
-                    }
-                </div>
 
-                <div class="mt-4">
-                    <h3>Tickets</h3>
-                    @if (proyecto.Tickets.Count == 0)
-                    {
-                        <p class="text-secondary mb-0">Sin tickets.</p>
-                    }
-                    else
-                    {
-                        <div class="list-group list-group-flush">
-                            @foreach (var ticket in proyecto.Tickets)
-                            {
-                                <div class="list-group-item px-0 d-flex justify-content-between align-items-center gap-3">
-                                    <div>
-                                        <span class="d-block fw-semibold">@ticket.Nombre</span>
-                                        @if (!string.IsNullOrWhiteSpace(ticket.Descripcion))
-                                        {
-                                            <small class="text-secondary d-block">@ticket.Descripcion</small>
-                                        }
-                                    </div>
-                                    <span class="status-badge @ClaseEstado(ticket.Estado)">@TextoEstado(ticket.Estado)</span>
-                                </div>
-                            }
-                        </div>
-                    }
                 </div>
             </article>
         }
+
+    </div>
+}
+
+@* Modal para Crear Proyecto *@
+@if (_mostrarModalProyecto)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Nuevo Proyecto</h5>
+                    <button type="button" class="btn-close" @onclick="() => _mostrarModalProyecto = false"></button>
+                </div>
+                <EditForm Model="_nuevoProyecto" OnValidSubmit="CrearProyectoAsync">
+                    <div class="modal-body py-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Nombre del Proyecto</label>
+                            <InputText class="form-control py-2" placeholder="Ej: Rediseño Web, Módulo Pagos..." @bind-Value="_nuevoProyecto.Nombre" required autofocus />
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-light" @onclick="() => _mostrarModalProyecto = false">Cancelar</button>
+                        <button type="submit" class="btn btn-primary px-4">Crear Proyecto</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@* Modal para Invitar / Sumar Usuario a Proyecto *@
+@if (_mostrarModalUsuario && _proyectoSeleccionado is not null)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Invitar al Proyecto</h5>
+                    <button type="button" class="btn-close" @onclick="() => _mostrarModalUsuario = false"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="text-secondary small mb-3">
+                        Seleccioná un usuario registrado para sumarlo a <strong>@_proyectoSeleccionado.Nombre</strong>. Una vez sumado, podrá ver el proyecto y los tickets que le asignes.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Seleccionar Usuario</label>
+                        <select class="form-select py-2" @bind="_usuarioIdParaAsignar">
+                            <option value="@Guid.Empty">Elegí una persona...</option>
+                            @foreach (var usuario in _usuariosDisponibles)
+                            {
+                                <option value="@usuario.Id">@usuario.Nombre</option>
+                            }
+
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" @onclick="() => _mostrarModalUsuario = false">Cancelar</button>
+                    <button type="button" class="btn btn-primary px-4" @onclick="AsignarUsuarioAsync">Sumar al Proyecto</button>
+                </div>
+            </div>
+        </div>
     </div>
 }
 
@@ -163,12 +192,15 @@ else
     private IReadOnlyList<ProyectoQueryDto> _proyectos = [];
     private IReadOnlyList<UsuarioQueryDto> _usuarios = [];
     private ProyectoCommandDto _nuevoProyecto = new() { Nombre = string.Empty };
-    private TicketCommandDto _nuevoTicket = new() { Nombre = string.Empty, Descripcion = string.Empty };
-    private AsignacionModel _asignacion = new();
-    private Guid _proyectoTicketId;
+    
     private bool _cargando;
     private bool _esError;
     private string? _mensaje;
+    
+    private bool _mostrarModalProyecto;
+    private bool _mostrarModalUsuario;
+    private ProyectoQueryDto? _proyectoSeleccionado;
+    private Guid _usuarioIdParaAsignar;
 
     protected override async Task OnInitializedAsync() => await CargarAsync();
 
@@ -178,75 +210,116 @@ else
 
         try
         {
-            _proyectos = await ProyectoService.ObtenerProyectosAsync();
+            var usuarioId = CurrentUserService.UsuarioId;
+            if (usuarioId.HasValue)
+            {
+                // Regla de privacidad: solo traemos los proyectos del usuario autenticado (creados o invitado)
+                _proyectos = await ProyectoService.ObtenerProyectosDelUsuarioAsync(usuarioId.Value);
+            }
+
+            else
+            {
+                _proyectos = [];
+            }
+
+
             _usuarios = await UsuarioService.ObtenerUsuariosAsync();
         }
+
         catch (Exception ex)
         {
             Mostrar($"No se pudieron cargar los proyectos: {ex.Message}", true);
         }
+
         finally
         {
             _cargando = false;
         }
+
     }
+
+
+    private bool EsCreadorDelProyecto(ProyectoQueryDto proyecto)
+    {
+        return CurrentUserService.UsuarioId.HasValue && proyecto.CreadorId == CurrentUserService.UsuarioId.Value;
+    }
+
+
+    private IEnumerable<UsuarioQueryDto> _usuariosDisponibles =>
+        _proyectoSeleccionado is null
+            ? _usuarios
+            : _usuarios.Where(u => !_proyectoSeleccionado.Usuarios.Any(pu => pu.Id == u.Id));
 
     private async Task CrearProyectoAsync()
     {
+        if (string.IsNullOrWhiteSpace(_nuevoProyecto.Nombre)) return;
+
         var result = await ProyectoService.CrearProyectoAsync(_nuevoProyecto);
         if (result.IsSuccess)
         {
             Mostrar("Proyecto creado exitosamente.", false);
             _nuevoProyecto = new ProyectoCommandDto { Nombre = string.Empty };
+            _mostrarModalProyecto = false;
             await CargarAsync();
         }
+
         else
         {
             Mostrar(result.Error.Mensaje, true);
         }
+
     }
 
-    private async Task CrearTicketAsync()
+
+    private void AbrirModalSumarUsuario(ProyectoQueryDto proyecto)
     {
-        if (_proyectoTicketId == Guid.Empty)
-        {
-            Mostrar("Seleccioná un proyecto.", true);
-            return;
-        }
-
-        var result = await TicketService.CrearTicketAsync(_proyectoTicketId, _nuevoTicket);
-        if (result.IsSuccess)
-        {
-            Mostrar("Ticket agregado exitosamente.", false);
-            _nuevoTicket = new TicketCommandDto { Nombre = string.Empty, Descripcion = string.Empty };
-            await CargarAsync();
-        }
-        else
-        {
-            Mostrar(result.Error.Mensaje, true);
-        }
+        _proyectoSeleccionado = proyecto;
+        _usuarioIdParaAsignar = Guid.Empty;
+        _mostrarModalUsuario = true;
     }
+
 
     private async Task AsignarUsuarioAsync()
     {
-        if (_asignacion.ProyectoId == Guid.Empty || _asignacion.UsuarioId == Guid.Empty)
+        if (_proyectoSeleccionado is null || _usuarioIdParaAsignar == Guid.Empty)
         {
-            Mostrar("Seleccioná un proyecto y un usuario.", true);
+            Mostrar("Seleccioná un usuario válido.", true);
             return;
         }
 
-        var result = await ProyectoService.AsignarUsuarioAProyectoAsync(_asignacion.ProyectoId, _asignacion.UsuarioId);
+
+        var result = await ProyectoService.AsignarUsuarioAProyectoAsync(_proyectoSeleccionado.Id, _usuarioIdParaAsignar);
         if (result.IsSuccess)
         {
-            Mostrar("Usuario asignado al proyecto.", false);
-            _asignacion = new AsignacionModel();
+            Mostrar("Usuario sumado al equipo del proyecto.", false);
+            _mostrarModalUsuario = false;
             await CargarAsync();
         }
+
         else
         {
             Mostrar(result.Error.Mensaje, true);
         }
+
     }
+
+
+    private async Task EliminarProyectoAsync(Guid proyectoId)
+    {
+        var result = await ProyectoService.EliminarProyectoAsync(proyectoId);
+        if (result.IsSuccess)
+        {
+            Mostrar("Proyecto eliminado.", false);
+            await CargarAsync();
+        }
+
+        else
+        {
+            Mostrar(result.Error.Mensaje, true);
+        }
+
+    }
+
 
     private void Mostrar(string mensaje, bool error)
     {
@@ -254,23 +327,4 @@ else
         _esError = error;
     }
 
-    private static string ClaseEstado(EEstadoTicket estado) => estado switch
-    {
-        EEstadoTicket.Cerrado => "status-closed",
-        EEstadoTicket.EnProgreso => "status-progress",
-        EEstadoTicket.Testing => "status-testing",
-        _ => "status-open"
-    };
-
-    private static string TextoEstado(EEstadoTicket estado) => estado switch
-    {
-        EEstadoTicket.EnProgreso => "En progreso",
-        _ => estado.ToString()
-    };
-
-    private sealed class AsignacionModel
-    {
-        public Guid ProyectoId { get; set; }
-        public Guid UsuarioId { get; set; }
-    }
 }

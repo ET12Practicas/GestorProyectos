@@ -1,117 +1,225 @@
 @page "/tickets"
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject ITicketService TicketService
 @inject IProyectoService ProyectoService
+@inject ICurrentUserService CurrentUserService
+@inject NavigationManager NavigationManager
 
-<PageTitle>Tickets</PageTitle>
+<PageTitle>Tablero Kanban - Gestor de Proyectos</PageTitle>
 
 <div class="page-heading">
     <div>
-        <span class="eyebrow">SEGUIMIENTO</span>
-        <h1>Tickets</h1>
-        <p>Asigná responsables, actualizá estados y mantené el tablero al día.</p>
+        <span class="eyebrow">SEGUIMIENTO KANBAN</span>
+        <h1>Tablero de Tickets</h1>
+        <p>Mové tarjetas, asigná responsables y verificá el avance en tiempo real.</p>
     </div>
-    <button class="btn btn-outline-primary" @onclick="CargarAsync">Actualizar</button>
+    <div class="d-flex align-items-center gap-2">
+        @if (_proyectosDelUsuario.Count > 0)
+        {
+            <div class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 fw-semibold text-secondary small">PROYECTO:</label>
+                <select class="form-select form-select-sm" style="min-width: 220px;" value="@_proyectoFiltroId" @onchange="OnCambiarProyectoFiltro">
+                    @foreach (var p in _proyectosDelUsuario)
+                    {
+                        <option value="@p.Id">@p.Nombre @(EsCreadorDelProyecto(p) ? "(Dueño)" : "(Invitado)")</option>
+                    }
+                </select>
+            </div>
+        }
+        @if (EsCreadorDelProyectoActual)
+        {
+            <button class="btn btn-primary btn-sm px-3" @onclick="() => _mostrarModalNuevoTicket = true">
+                + Nuevo Ticket
+            </button>
+        }
+        <button class="btn btn-outline-primary btn-sm" @onclick="CargarAsync">↻</button>
+    </div>
 </div>
 
 @if (_mensaje is not null)
 {
-    <div class="alert @(_esError ? "alert-danger" : "alert-success")" role="alert">@_mensaje</div>
+    <div class="alert @(_esError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+        @_mensaje
+        <button type="button" class="btn-close" @onclick="() => _mensaje = null"></button>
+    </div>
 }
 
 @if (_cargando)
 {
-    <p><em>Cargando tickets...</em></p>
+    <div class="text-center my-5 py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="text-secondary mt-3">Cargando tablero...</p>
+    </div>
 }
-else if (_tickets.Count == 0)
+else if (_proyectosDelUsuario.Count == 0)
 {
-    <div class="empty-state">No hay tickets registrados.</div>
+    <div class="empty-state my-5 py-5">
+        <span class="display-4">📋</span>
+        <h3 class="mt-3">No tenés proyectos disponibles</h3>
+        <p class="text-secondary">Para ver tickets y tableros Kanban, primero necesitás crear un proyecto o ser invitado a uno.</p>
+        <a href="proyectos" class="btn btn-primary mt-2">Ir a Proyectos</a>
+    </div>
 }
 else
 {
-    <section class="content-card table-responsive">
-        <div class="mb-4">
-            <h2 class="mb-1">Asignación de responsables</h2>
-            <p class="text-secondary mb-0">
-                Cada ticket sólo puede asignarse a usuarios que pertenezcan a su proyecto.
-            </p>
-        </div>
+    @* Tablero Kanban con 4 columnas *@
+    <div class="kanban-board">
+        @RenderColumna(EEstadoTicket.Abierto, "📥 Abierto", "status-open")
+        @RenderColumna(EEstadoTicket.EnProgreso, "⏳ En Progreso", "status-progress")
+        @RenderColumna(EEstadoTicket.Testing, "🧪 Testing", "status-testing")
+        @RenderColumna(EEstadoTicket.Cerrado, "✅ Cerrado", "status-closed")
+    </div>
+}
 
-        <table class="table align-middle mb-0">
-            <thead>
-                <tr>
-                    <th>Ticket</th>
-                    <th>Proyecto</th>
-                    <th>Responsable</th>
-                    <th>Fecha</th>
-                    <th>Estado</th>
-                    <th class="text-end">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var ticket in _tickets)
+@* Fragmento de Renderizado de Columna Kanban *@
+@code {
+    RenderFragment RenderColumna(EEstadoTicket estado, string titulo, string badgeClass) => __builder =>
+    {
+        var ticketsDeColumna = _ticketsActuales.Where(t => t.Estado == estado).ToList();
+
+        <div class="kanban-column">
+            <div class="kanban-column-header">
+                <h3>@titulo</h3>
+                <span class="kanban-column-badge">@ticketsDeColumna.Count</span>
+            </div>
+
+            <div class="kanban-cards">
+                @if (ticketsDeColumna.Count == 0)
                 {
-                    var usuarios = UsuariosDelTicket(ticket.Id);
+                    <div class="text-center py-4 text-muted small fst-italic">
+                        Sin tickets
+                    </div>
+                }
+                else
+                {
+                    @foreach (var ticket in ticketsDeColumna)
+                    {
+                        var puedeMover = PuedeMoverEstado(ticket);
+                        var esCreador = EsCreadorDelProyectoActual;
 
-                    <tr>
-                        <td class="fw-semibold">
-                            <div>@ticket.Nombre</div>
+                        <div class="kanban-card">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <h4 class="kanban-card-title">@ticket.Nombre</h4>
+                                @if (esCreador)
+                                {
+                                    <button class="btn btn-sm btn-link text-danger p-0 border-0" title="Eliminar ticket" @onclick="() => EliminarAsync(ticket.Id)">
+                                        ✕
+                                    </button>
+                                }
+                            </div>
+
                             @if (!string.IsNullOrWhiteSpace(ticket.Descripcion))
                             {
-                                <small class="text-secondary fw-normal d-block">@ticket.Descripcion</small>
+                                <p class="kanban-card-desc">@ticket.Descripcion</p>
                             }
-                        </td>
-                        <td>@NombreProyecto(ticket.Id)</td>
-                        <td>
-                            <select class="form-select form-select-sm responsable-select"
-                                    value="@(ticket.Usuario?.Id.ToString() ?? string.Empty)"
-                                    disabled="@(usuarios.Count == 0)"
-                                    aria-label="Responsable de @ticket.Nombre"
-                                    @onchange="args => AsignarUsuarioAsync(ticket.Id, args.Value?.ToString())">
-                                @if (usuarios.Count == 0)
+
+                            <div class="kanban-card-footer">
+                                @* Selector o Vista de Responsable *@
+                                @if (esCreador)
                                 {
-                                    <option value="">Sin usuarios en el proyecto</option>
+                                    <select class="form-select form-select-sm responsable-select me-2"
+                                            style="font-size: 0.78rem;"
+                                            value="@(ticket.Usuario?.Id.ToString() ?? string.Empty)"
+                                            @onchange="args => AsignarResponsableAsync(ticket.Id, args.Value?.ToString())">
+                                        <option value="">(Sin asignar)</option>
+                                        @foreach (var miembro in MiembrosDelProyectoActual)
+                                        {
+                                            <option value="@miembro.Id">@miembro.Nombre</option>
+                                        }
+                                    </select>
                                 }
                                 else
                                 {
-                                    <option value="" disabled>Seleccionar responsable...</option>
-                                    @foreach (var usuario in usuarios)
+                                    <span class="small text-secondary">
+                                        👤 @(ticket.Usuario?.Nombre ?? "Sin asignar")
+                                    </span>
+                                }
+
+                                @* Selector de Estado *@
+                                <div class="ms-auto">
+                                    @if (puedeMover)
                                     {
-                                        <option value="@usuario.Id">@usuario.Nombre</option>
+                                        <select class="form-select form-select-sm status-select"
+                                                style="font-size: 0.78rem;"
+                                                value="@ticket.Estado"
+                                                @onchange="args => CambiarEstadoAsync(ticket.Id, args.Value?.ToString())">
+                                            @foreach (var est in Enum.GetValues<EEstadoTicket>())
+                                            {
+                                                <option value="@est">@TextoEstado(est)</option>
+                                            }
+                                        </select>
                                     }
-                                }
-                            </select>
-                        </td>
-                        <td>@ticket.Fecha.ToLocalTime().ToString("dd/MM/yyyy")</td>
-                        <td>
-                            <select class="form-select form-select-sm status-select"
-                                    value="@ticket.Estado"
-                                    aria-label="Estado de @ticket.Nombre"
-                                    @onchange="args => CambiarEstadoAsync(ticket.Id, args.Value?.ToString())">
-                                @foreach (var estado in Enum.GetValues<EEstadoTicket>())
-                                {
-                                    <option value="@estado">@TextoEstado(estado)</option>
-                                }
-                            </select>
-                        </td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(ticket.Id)">
-                                Eliminar
-                            </button>
-                        </td>
-                    </tr>
+                                    else
+                                    {
+                                        <span class="status-badge @ClaseEstado(ticket.Estado)" style="font-size: 0.72rem;">
+                                            @TextoEstado(ticket.Estado)
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
                 }
-            </tbody>
-        </table>
-    </section>
+            </div>
+        </div>
+    };
+}
+
+@* Modal para Crear Ticket (Solo Creador del Proyecto) *@
+@if (_mostrarModalNuevoTicket && ProyectoActual is not null)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Nuevo Ticket para @ProyectoActual.Nombre</h5>
+                    <button type="button" class="btn-close" @onclick="() => _mostrarModalNuevoTicket = false"></button>
+                </div>
+                <EditForm Model="_nuevoTicket" OnValidSubmit="CrearTicketAsync">
+                    <div class="modal-body py-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Nombre de la tarea / ticket</label>
+                            <InputText class="form-control py-2" placeholder="Ej: Implementar endpoint de pagos..." @bind-Value="_nuevoTicket.Nombre" required autofocus />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Descripción</label>
+                            <InputTextArea class="form-control" rows="3" placeholder="Detalles de los requerimientos o criterios de aceptación..." @bind-Value="_nuevoTicket.Descripcion" />
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-light" @onclick="() => _mostrarModalNuevoTicket = false">Cancelar</button>
+                        <button type="submit" class="btn btn-primary px-4">Agregar Ticket</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
 }
 
 @code {
-    private IReadOnlyList<TicketQueryDto> _tickets = [];
-    private IReadOnlyList<ProyectoQueryDto> _proyectos = [];
+    [SupplyParameterFromQuery]
+    public Guid? ProyectoId { get; set; }
+
+    private IReadOnlyList<ProyectoQueryDto> _proyectosDelUsuario = [];
+    private IReadOnlyList<TicketQueryDto> _ticketsActuales = [];
+
+    private Guid _proyectoFiltroId;
     private bool _cargando;
     private bool _esError;
     private string? _mensaje;
+    private bool _mostrarModalNuevoTicket;
+
+    private TicketCommandDto _nuevoTicket = new() { Nombre = string.Empty, Descripcion = string.Empty };
+
+    private ProyectoQueryDto? ProyectoActual =>
+        _proyectosDelUsuario.FirstOrDefault(p => p.Id == _proyectoFiltroId);
+
+    private bool EsCreadorDelProyectoActual =>
+        ProyectoActual is not null && EsCreadorDelProyecto(ProyectoActual);
+
+    private IReadOnlyList<UsuarioQueryDto> MiembrosDelProyectoActual =>
+        ProyectoActual?.Usuarios ?? [];
 
     protected override async Task OnInitializedAsync() => await CargarAsync();
 
@@ -121,12 +229,35 @@ else
 
         try
         {
-            _tickets = await TicketService.ObtenerTicketsAsync();
-            _proyectos = await ProyectoService.ObtenerProyectosAsync();
+            var usuarioId = CurrentUserService.UsuarioId;
+            if (usuarioId.HasValue)
+            {
+                // Regla de privacidad: solo traemos los proyectos del usuario autenticado
+                _proyectosDelUsuario = await ProyectoService.ObtenerProyectosDelUsuarioAsync(usuarioId.Value);
+
+                if (_proyectosDelUsuario.Count > 0)
+                {
+                    // Si viene por Query parameter y el usuario tiene acceso a ese proyecto, lo usamos
+                    if (ProyectoId.HasValue && _proyectosDelUsuario.Any(p => p.Id == ProyectoId.Value))
+                    {
+                        _proyectoFiltroId = ProyectoId.Value;
+                    }
+                    else if (_proyectoFiltroId == Guid.Empty || !_proyectosDelUsuario.Any(p => p.Id == _proyectoFiltroId))
+                    {
+                        _proyectoFiltroId = _proyectosDelUsuario[0].Id;
+                    }
+
+                    await CargarTicketsDelProyectoAsync(_proyectoFiltroId);
+                }
+                else
+                {
+                    _ticketsActuales = [];
+                }
+            }
         }
         catch (Exception ex)
         {
-            Mostrar($"No se pudieron cargar los tickets: {ex.Message}", true);
+            Mostrar($"Error al cargar tablero: {ex.Message}", true);
         }
         finally
         {
@@ -134,29 +265,48 @@ else
         }
     }
 
-    private IReadOnlyList<UsuarioQueryDto> UsuariosDelTicket(Guid ticketId) =>
-        ProyectoDelTicket(ticketId)?.Usuarios ?? [];
-
-    private string NombreProyecto(Guid ticketId) =>
-        ProyectoDelTicket(ticketId)?.Nombre ?? "Sin proyecto";
-
-    private ProyectoQueryDto? ProyectoDelTicket(Guid ticketId) =>
-        _proyectos.FirstOrDefault(proyecto =>
-            proyecto.Tickets.Any(ticket => ticket.Id == ticketId));
-
-    private async Task AsignarUsuarioAsync(Guid ticketId, string? valor)
+    private async Task CargarTicketsDelProyectoAsync(Guid proyectoId)
     {
-        if (!Guid.TryParse(valor, out var usuarioId))
-        {
-            Mostrar("Seleccioná un usuario válido.", true);
-            return;
-        }
+        _ticketsActuales = await TicketService.ObtenerTicketsPorProyectoAsync(proyectoId);
+    }
 
-        var result = await TicketService.AsignarUsuarioATicketAsync(ticketId, usuarioId);
+    private async Task OnCambiarProyectoFiltro(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            _proyectoFiltroId = id;
+            await CargarTicketsDelProyectoAsync(id);
+        }
+    }
+
+    private bool EsCreadorDelProyecto(ProyectoQueryDto proyecto)
+    {
+        return CurrentUserService.UsuarioId.HasValue && proyecto.CreadorId == CurrentUserService.UsuarioId.Value;
+    }
+
+    private bool PuedeMoverEstado(TicketQueryDto ticket)
+    {
+        if (!CurrentUserService.UsuarioId.HasValue) return false;
+        var userId = CurrentUserService.UsuarioId.Value;
+
+        // Creador del proyecto puede mover cualquiera; colaborador solo si está asignado a él
+        var esCreador = EsCreadorDelProyectoActual;
+        var esAsignado = ticket.Usuario?.Id == userId;
+
+        return esCreador || esAsignado;
+    }
+
+    private async Task CrearTicketAsync()
+    {
+        if (_proyectoFiltroId == Guid.Empty || string.IsNullOrWhiteSpace(_nuevoTicket.Nombre)) return;
+
+        var result = await TicketService.CrearTicketAsync(_proyectoFiltroId, _nuevoTicket);
         if (result.IsSuccess)
         {
-            Mostrar("Responsable asignado exitosamente.", false);
-            await CargarAsync();
+            Mostrar("Ticket creado y añadido al tablero.", false);
+            _nuevoTicket = new TicketCommandDto { Nombre = string.Empty, Descripcion = string.Empty };
+            _mostrarModalNuevoTicket = false;
+            await CargarTicketsDelProyectoAsync(_proyectoFiltroId);
         }
         else
         {
@@ -166,17 +316,40 @@ else
 
     private async Task CambiarEstadoAsync(Guid ticketId, string? valor)
     {
-        if (!Enum.TryParse<EEstadoTicket>(valor, out var estado))
-        {
-            Mostrar("El estado seleccionado no es válido.", true);
-            return;
-        }
+        if (!Enum.TryParse<EEstadoTicket>(valor, out var estado)) return;
 
         var result = await TicketService.CambiarEstadoTicketAsync(ticketId, new EstadoTicketDto { Estado = estado });
         if (result.IsSuccess)
         {
-            Mostrar("Estado actualizado exitosamente.", false);
-            await CargarAsync();
+            Mostrar("Estado de ticket actualizado.", false);
+            await CargarTicketsDelProyectoAsync(_proyectoFiltroId);
+        }
+        else
+        {
+            Mostrar(result.Error.Mensaje, true);
+        }
+    }
+
+    private async Task AsignarResponsableAsync(Guid ticketId, string? valor)
+    {
+        if (string.IsNullOrEmpty(valor))
+        {
+            var res = await TicketService.DesasignarUsuarioDeTicketAsync(ticketId);
+            if (res.IsSuccess)
+            {
+                Mostrar("Responsable quitado.", false);
+                await CargarTicketsDelProyectoAsync(_proyectoFiltroId);
+            }
+            return;
+        }
+
+        if (!Guid.TryParse(valor, out var usuarioId)) return;
+
+        var result = await TicketService.AsignarUsuarioATicketAsync(ticketId, usuarioId);
+        if (result.IsSuccess)
+        {
+            Mostrar("Responsable asignado exitosamente.", false);
+            await CargarTicketsDelProyectoAsync(_proyectoFiltroId);
         }
         else
         {
@@ -189,8 +362,8 @@ else
         var result = await TicketService.EliminarTicketAsync(ticketId);
         if (result.IsSuccess)
         {
-            Mostrar("Ticket eliminado exitosamente.", false);
-            await CargarAsync();
+            Mostrar("Ticket eliminado.", false);
+            await CargarTicketsDelProyectoAsync(_proyectoFiltroId);
         }
         else
         {
@@ -203,6 +376,14 @@ else
         _mensaje = mensaje;
         _esError = error;
     }
+
+    private static string ClaseEstado(EEstadoTicket estado) => estado switch
+    {
+        EEstadoTicket.Cerrado => "status-closed",
+        EEstadoTicket.EnProgreso => "status-progress",
+        EEstadoTicket.Testing => "status-testing",
+        _ => "status-open"
+    };
 
     private static string TextoEstado(EEstadoTicket estado) => estado switch
     {

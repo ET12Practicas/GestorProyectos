@@ -1,0 +1,69 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject NavigationManager NavigationManager
+
+<PageTitle>Iniciar Sesión - Gestor de Proyectos</PageTitle>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <span class="eyebrow">BIENVENIDO</span>
+            <h1>Iniciar Sesión</h1>
+            <p>Ingresá tus credenciales para acceder a tus proyectos.</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger" role="alert">
+                @_error
+            </div>
+        }
+
+        <form method="post" action="/auth/login-cookie">
+            <AntiforgeryToken />
+            
+            <div class="mb-3">
+                <label for="email" class="form-label">Correo Electrónico</label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="ejemplo@demo.com" required autofocus />
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Contraseña</label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required />
+            </div>
+
+            <div class="mb-4 form-check">
+                <input type="checkbox" id="recordarme" name="recordarme" value="true" class="form-check-input" />
+                <label for="recordarme" class="form-check-label">Recordarme en este equipo</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2">Ingresar</button>
+        </form>
+
+        <div class="auth-footer mt-4 text-center">
+            <p class="text-secondary mb-0">
+                ¿No tenés una cuenta? <a href="/registro" class="fw-semibold">Registrate acá</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Error { get; set; }
+
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (Error == "credenciales")
+        {
+            _error = "Correo electrónico o contraseña incorrectos.";
+        }
+        else if (Error == "datos")
+        {
+            _error = "Por favor, completá todos los campos requeridos.";
+        }
+    }
+}
+

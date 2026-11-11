@@ -13,7 +13,7 @@ public sealed class ComentarioEndpoints : ICarterModule
         {
             var comentarios = await service.ObtenerComentariosAsync(ct);
             return Results.Ok(comentarios);
-        });
+        }).RequireAuthorization();
 
         group.MapDelete("/{comentarioId:guid}", async (
             IComentarioService service,

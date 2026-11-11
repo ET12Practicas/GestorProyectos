@@ -13,7 +13,7 @@ public sealed class AuthService(
     IValidator<RegistroUsuarioDto> registroValidator,
     IValidator<LoginUsuarioDto> loginValidator) : IAuthService
 {
-    public async Task<Result<UsuarioAutenticadoDto>> RegistrarAsync(
+    public async Task<Result<string>> RegistrarAsync(
         RegistroUsuarioDto dto,
         CancellationToken cancellationToken = default)
     {
@@ -21,13 +21,13 @@ public sealed class AuthService(
         if (!validacion.IsValid)
         {
             var primerError = validacion.Errors[0].ErrorMessage;
-            return Result.Failure<UsuarioAutenticadoDto>(Error.Validation(primerError));
+            return Result.Failure<string>(Error.Validation(primerError));
         }
 
         var existeUsuario = await userManager.FindByEmailAsync(dto.Email.Trim());
         if (existeUsuario is not null)
         {
-            return Result.Failure<UsuarioAutenticadoDto>(Error.Conflict("Ya existe un usuario registrado con ese email."));
+            return Result.Failure<string>(Error.Conflict("Ya existe un usuario registrado con ese email."));
         }
 
         var usuario = new Usuario(dto.Nombre.Trim())
@@ -41,23 +41,10 @@ public sealed class AuthService(
         if (!resultado.Succeeded)
         {
             var mensajeError = string.Join(", ", resultado.Errors.Select(e => e.Description));
-            return Result.Failure<UsuarioAutenticadoDto>(Error.Validation(mensajeError));
+            return Result.Failure<string>(Error.Validation(mensajeError));
         }
 
-        // Emitir cookie de sesión
-        await signInManager.SignInAsync(usuario, isPersistent: false);
-
-        // Emitir token JWT
-        var (token, expiraEn) = tokenService.GenerarToken(usuario);
-
-        return Result.Success(new UsuarioAutenticadoDto
-        {
-            Id = usuario.Id,
-            Nombre = usuario.Nombre,
-            Email = usuario.Email!,
-            Token = token,
-            ExpiraEn = expiraEn
-        });
+        return Result.Success("Usuario registrado exitosamente.");
     }
 
     public async Task<Result<UsuarioAutenticadoDto>> IniciarSesionAsync(

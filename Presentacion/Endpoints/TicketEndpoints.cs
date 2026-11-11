@@ -14,13 +14,13 @@ public sealed class TicketEndpoints : ICarterModule
         {
             var tickets = await service.ObtenerTicketsAsync(ct);
             return Results.Ok(tickets);
-        });
+        }).RequireAuthorization();
 
         group.MapGet("/{ticketId:guid}", async (ITicketService service, Guid ticketId, CancellationToken ct) =>
         {
             var ticket = await service.ObtenerTicketPorIdAsync(ticketId, ct);
             return ticket is not null ? Results.Ok(ticket) : Results.NotFound();
-        });
+        }).RequireAuthorization();
 
         group.MapPut("/{ticketId:guid}/estado", async (
             ITicketService service,
@@ -68,7 +68,7 @@ public sealed class TicketEndpoints : ICarterModule
         {
             var comentarios = await comentarioService.ObtenerComentariosPorTicketAsync(ticketId, ct);
             return Results.Ok(comentarios);
-        });
+        }).RequireAuthorization();
 
         group.MapPost("/{ticketId:guid}/usuarios/{usuarioId:guid}/comentarios", async (
             IComentarioService comentarioService,

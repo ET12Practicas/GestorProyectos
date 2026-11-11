@@ -1,0 +1,70 @@
+@page "/registro"
+@attribute [AllowAnonymous]
+@inject NavigationManager NavigationManager
+
+<PageTitle>Registro de Usuario - Gestor de Proyectos</PageTitle>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <span class="eyebrow">NUEVA CUENTA</span>
+            <h1>Crear Cuenta</h1>
+            <p>Completá el formulario para registrarte en la plataforma.</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger" role="alert">
+                @_error
+            </div>
+        }
+
+        <form method="post" action="/auth/registro-cookie">
+            <AntiforgeryToken />
+            
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre Completo</label>
+                <input type="text" id="nombre" name="nombre" class="form-control" placeholder="Tu nombre" required autofocus />
+            </div>
+
+            <div class="mb-3">
+                <label for="email" class="form-label">Correo Electrónico</label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="ejemplo@demo.com" required />
+            </div>
+
+            <div class="mb-4">
+                <label for="password" class="form-label">Contraseña</label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="Mínimo 6 caracteres" required minlength="6" />
+                <div class="form-text">Debe tener al menos 6 caracteres.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2">Registrarme</button>
+        </form>
+
+        <div class="auth-footer mt-4 text-center">
+            <p class="text-secondary mb-0">
+                ¿Ya tenés una cuenta? <a href="/login" class="fw-semibold">Iniciá sesión acá</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Error { get; set; }
+
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(Error))
+        {
+            _error = Error switch
+            {
+                "duplicado" => "Ya existe un usuario registrado con ese correo electrónico.",
+                "datos" => "Por favor, verificá que los datos ingresados sean correctos.",
+                _ => Uri.UnescapeDataString(Error)
+            };
+        }
+    }
+}

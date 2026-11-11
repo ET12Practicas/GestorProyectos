@@ -19,16 +19,6 @@
 
 <div class="row g-4">
     <div class="col-lg-4">
-        <section class="content-card">
-            <h2>Nuevo usuario</h2>
-            <EditForm Model="_nuevoUsuario" OnValidSubmit="CrearAsync" FormName="crear-usuario">
-                <div class="mb-3">
-                    <label class="form-label" for="nombre-usuario">Nombre</label>
-                    <InputText id="nombre-usuario" class="form-control" @bind-Value="_nuevoUsuario.Nombre" />
-                </div>
-                <button class="btn btn-primary w-100" type="submit">Crear usuario</button>
-            </EditForm>
-        </section>
     </div>
 
     <div class="col-lg-8">
@@ -57,7 +47,7 @@
                                 <strong>@usuario.Nombre</strong>
                                 <small>@usuario.Id</small>
                             </div>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(usuario.Id)">Eliminar</button>
+
                         </div>
                     }
                 </div>
@@ -68,7 +58,7 @@
 
 @code {
     private IReadOnlyList<UsuarioQueryDto> _usuarios = [];
-    private UsuarioCommandDto _nuevoUsuario = new() { Nombre = string.Empty };
+
     private bool _cargando;
     private bool _esError;
     private string? _mensaje;
@@ -93,20 +83,7 @@
         }
     }
 
-    private async Task CrearAsync()
-    {
-        var result = await UsuarioService.CrearUsuarioAsync(_nuevoUsuario);
-        if (result.IsSuccess)
-        {
-            Mostrar("Usuario creado exitosamente.", false);
-            _nuevoUsuario = new UsuarioCommandDto { Nombre = string.Empty };
-            await CargarAsync();
-        }
-        else
-        {
-            Mostrar(result.Error.Mensaje, true);
-        }
-    }
+
 
     private async Task EliminarAsync(Guid usuarioId)
     {

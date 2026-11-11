@@ -1,4 +1,4 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">Gestor de proyectos</a>
     </div>
@@ -14,29 +14,45 @@
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="proyectos">
-                <span class="nav-symbol" aria-hidden="true">▦</span> Proyectos
-            </NavLink>
-        </div>
+        <AuthorizeView>
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="proyectos">
+                        <span class="nav-symbol" aria-hidden="true">▦</span> Proyectos
+                    </NavLink>
+                </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="tickets">
-                <span class="nav-symbol" aria-hidden="true">✓</span> Tickets
-            </NavLink>
-        </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="tickets">
+                        <span class="nav-symbol" aria-hidden="true">✓</span> Tickets
+                    </NavLink>
+                </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="usuarios">
-                <span class="nav-symbol" aria-hidden="true">♙</span> Usuarios
-            </NavLink>
-        </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="usuarios">
+                        <span class="nav-symbol" aria-hidden="true">♙</span> Usuarios
+                    </NavLink>
+                </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="comentarios">
-                <span class="nav-symbol" aria-hidden="true">◌</span> Comentarios
-            </NavLink>
-        </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="comentarios">
+                        <span class="nav-symbol" aria-hidden="true">◌</span> Comentarios
+                    </NavLink>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="login">
+                        <span class="nav-symbol" aria-hidden="true">🔑</span> Iniciar Sesión
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="registro">
+                        <span class="nav-symbol" aria-hidden="true">📝</span> Registrarse
+                    </NavLink>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
     </nav>
 </div>
 

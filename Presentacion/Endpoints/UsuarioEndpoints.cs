@@ -21,11 +21,7 @@ public sealed class UsuarioEndpoints : ICarterModule
             return usuario is not null ? Results.Ok(usuario) : Results.NotFound();
         });
 
-        group.MapPost("/", async (IUsuarioService service, UsuarioCommandDto dto, CancellationToken ct) =>
-        {
-            var result = await service.CrearUsuarioAsync(dto, ct);
-            return result.ToHttpResult($"/api/usuarios/{result.Value}");
-        });
+
 
         group.MapDelete("/{usuarioId:guid}", async (IUsuarioService service, Guid usuarioId, CancellationToken ct) =>
         {
