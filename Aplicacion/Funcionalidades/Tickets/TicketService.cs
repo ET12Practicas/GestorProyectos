@@ -61,13 +61,12 @@ internal sealed class TicketService(
             return Result.Failure<Guid>(Error.NotFound("Proyecto no encontrado."));
         }
 
-        // Regla: Solo el creador o miembros del proyecto pueden crear tickets
+        // Regla: Solo el creador del proyecto puede crear tickets en él
         if (currentUserService.IsAuthenticated &&
             proyecto.CreadorId.HasValue &&
-            currentUserService.UsuarioId != proyecto.CreadorId &&
-            !proyecto.Usuarios.Any(u => u.Id == currentUserService.UsuarioId))
+            currentUserService.UsuarioId != proyecto.CreadorId)
         {
-            return Result.Failure<Guid>(Error.Forbidden("Solo el creador o miembros del proyecto pueden crear tickets en él."));
+            return Result.Failure<Guid>(Error.Forbidden("Solo el creador del proyecto puede agregar nuevos tickets."));
         }
 
         var ticket = new Ticket(dto.Nombre.Trim(), dto.Descripcion?.Trim() ?? string.Empty)
@@ -96,6 +95,20 @@ internal sealed class TicketService(
             return Result.Failure(Error.NotFound("Ticket no encontrado."));
         }
 
+        // Regla: El creador del proyecto puede cambiar el estado de cualquier ticket de su proyecto.
+        // Los colaboradores invitados solo pueden cambiar el estado del ticket si lo tienen asignado.
+        if (currentUserService.IsAuthenticated)
+        {
+            var userId = currentUserService.UsuarioId;
+            var esCreador = ticket.ProyectoTicket?.CreadorId == userId;
+            var esAsignado = ticket.UsuarioId == userId;
+
+            if (!esCreador && !esAsignado)
+            {
+                return Result.Failure(Error.Forbidden("Solo el creador del proyecto o el usuario asignado al ticket pueden cambiar su estado."));
+            }
+        }
+
         ticket.Estado = dto.Estado;
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
         return Result.Success();
@@ -107,6 +120,14 @@ internal sealed class TicketService(
         if (ticket is null)
         {
             return Result.Failure(Error.NotFound("Ticket no encontrado."));
+        }
+
+        // Regla: Solo el creador del proyecto puede asignar responsables a los tickets
+        if (currentUserService.IsAuthenticated &&
+            ticket.ProyectoTicket?.CreadorId.HasValue == true &&
+            currentUserService.UsuarioId != ticket.ProyectoTicket.CreadorId)
+        {
+            return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede asignar responsables a los tickets."));
         }
 
         var usuario = await usuarioRepository.ObtenerUsuarioAsync(usuarioId, cancellationToken);
@@ -132,6 +153,14 @@ internal sealed class TicketService(
         if (ticket is null)
         {
             return Result.Failure(Error.NotFound("Ticket no encontrado."));
+        }
+
+        // Regla: Solo el creador del proyecto puede desasignar responsables
+        if (currentUserService.IsAuthenticated &&
+            ticket.ProyectoTicket?.CreadorId.HasValue == true &&
+            currentUserService.UsuarioId != ticket.ProyectoTicket.CreadorId)
+        {
+            return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede desasignar responsables."));
         }
 
         ticket.UsuarioTicket = null;

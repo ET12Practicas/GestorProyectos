@@ -9,14 +9,13 @@ public interface IUsuarioService
 {
     Task<IReadOnlyList<UsuarioQueryDto>> ObtenerUsuariosAsync(CancellationToken cancellationToken = default);
     Task<UsuarioQueryDto?> ObtenerUsuarioPorIdAsync(Guid usuarioId, CancellationToken cancellationToken = default);
-    Task<Result<Guid>> CrearUsuarioAsync(UsuarioCommandDto dto, CancellationToken cancellationToken = default);
+
     Task<Result> EliminarUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default);
 }
 
 internal sealed class UsuarioService(
     IUsuarioRepository usuarioRepository,
-    IUnidadDeTrabajo unidadDeTrabajo,
-    IValidator<UsuarioCommandDto> validator) : IUsuarioService
+    IUnidadDeTrabajo unidadDeTrabajo) : IUsuarioService
 {
     public async Task<IReadOnlyList<UsuarioQueryDto>> ObtenerUsuariosAsync(CancellationToken cancellationToken = default)
     {
@@ -30,21 +29,7 @@ internal sealed class UsuarioService(
         return usuario is null ? null : MapearUsuario(usuario);
     }
 
-    public async Task<Result<Guid>> CrearUsuarioAsync(UsuarioCommandDto dto, CancellationToken cancellationToken = default)
-    {
-        var validacion = await validator.ValidateAsync(dto, cancellationToken);
-        if (!validacion.IsValid)
-        {
-            var primerError = validacion.Errors[0].ErrorMessage;
-            return Result.Failure<Guid>(Error.Validation(primerError));
-        }
-
-        var usuario = new Usuario(dto.Nombre.Trim());
-        usuarioRepository.AgregarUsuario(usuario);
-        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
-
-        return Result.Success(usuario.Id);
-    }
+    
 
     public async Task<Result> EliminarUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {

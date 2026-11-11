@@ -32,6 +32,7 @@ internal sealed class TicketRepository(ProyectoDbContext context) : ITicketRepos
     {
         return await context.Tickets
             .Include(ticket => ticket.UsuarioTicket)
+            .Include(ticket => ticket.ProyectoTicket)
             .FirstOrDefaultAsync(ticket => ticket.Id == ticketId, cancellationToken);
     }
 
