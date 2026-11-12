@@ -88,22 +88,40 @@ else
                                 </button>
                             }
 
+
+
                         </div>
                         @if (proyecto.Usuarios.Count == 0)
                         {
                             <span class="text-muted small">Sin miembros aún.</span>
                         }
 
+
+
                         else
                         {
                             <div class="chip-list">
                                 @foreach (var usuario in proyecto.Usuarios)
                                 {
-                                    <span class="person-chip">@usuario.Nombre</span>
+                                    <span class="person-chip">
+                                        @usuario.Nombre
+                                        @if (esCreador && usuario.Id != CurrentUserService.UsuarioId.GetValueOrDefault())
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger ms-1"
+                                                    @onclick="() => AbrirModalEliminarUsuario(proyecto, usuario)"
+                                                    title="Eliminar del proyecto">✕</button>
+                                        }
+
+
+                                    </span>
                                 }
+
+
 
                             </div>
                         }
+
+
 
                     </div>
                 </div>
@@ -119,9 +137,13 @@ else
                         </button>
                     }
 
+
+
                 </div>
             </article>
         }
+
+
 
     </div>
 }
@@ -176,12 +198,39 @@ else
                                 <option value="@usuario.Id">@usuario.Nombre</option>
                             }
 
+
+
                         </select>
                     </div>
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-light" @onclick="() => _mostrarModalUsuario = false">Cancelar</button>
                     <button type="button" class="btn btn-primary px-4" @onclick="AsignarUsuarioAsync">Sumar al Proyecto</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Modal para confirmar eliminación de usuario del proyecto *@
+@if (_mostrarModalEliminarUsuario)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Eliminar usuario del proyecto</h5>
+                    <button type="button" class="btn-close" @onclick="() => _mostrarModalEliminarUsuario = false"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="text-secondary mb-3">
+                        ¿Estás seguro de que deseas remover a <strong>@_usuarioSeleccionado?.Nombre</strong> del proyecto <strong>@_proyectoParaEliminarUsuario?.Nombre</strong>?<br />
+                        Esta acción no eliminará al usuario del sistema, solo lo desvinculará del proyecto.
+                    </p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" @onclick="() => _mostrarModalEliminarUsuario = false">Cancelar</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmarEliminarUsuarioAsync">Eliminar</button>
                 </div>
             </div>
         </div>
@@ -199,6 +248,9 @@ else
     
     private bool _mostrarModalProyecto;
     private bool _mostrarModalUsuario;
+    private bool _mostrarModalEliminarUsuario;
+    private ProyectoQueryDto? _proyectoParaEliminarUsuario;
+    private UsuarioQueryDto? _usuarioSeleccionado;
     private ProyectoQueryDto? _proyectoSeleccionado;
     private Guid _usuarioIdParaAsignar;
 
@@ -217,32 +269,46 @@ else
                 _proyectos = await ProyectoService.ObtenerProyectosDelUsuarioAsync(usuarioId.Value);
             }
 
+
+
             else
             {
                 _proyectos = [];
             }
 
 
+
+
             _usuarios = await UsuarioService.ObtenerUsuariosAsync();
         }
+
+
 
         catch (Exception ex)
         {
             Mostrar($"No se pudieron cargar los proyectos: {ex.Message}", true);
         }
 
+
+
         finally
         {
             _cargando = false;
         }
 
+
+
     }
+
+
 
 
     private bool EsCreadorDelProyecto(ProyectoQueryDto proyecto)
     {
         return CurrentUserService.UsuarioId.HasValue && proyecto.CreadorId == CurrentUserService.UsuarioId.Value;
     }
+
+
 
 
     private IEnumerable<UsuarioQueryDto> _usuariosDisponibles =>
@@ -263,12 +329,18 @@ else
             await CargarAsync();
         }
 
+
+
         else
         {
             Mostrar(result.Error.Mensaje, true);
         }
 
+
+
     }
+
+
 
 
     private void AbrirModalSumarUsuario(ProyectoQueryDto proyecto)
@@ -277,6 +349,37 @@ else
         _usuarioIdParaAsignar = Guid.Empty;
         _mostrarModalUsuario = true;
     }
+
+    // Open the delete‑user confirmation modal (owner only)
+    private void AbrirModalEliminarUsuario(ProyectoQueryDto proyecto, UsuarioQueryDto usuario)
+    {
+        _proyectoParaEliminarUsuario = proyecto;
+        _usuarioSeleccionado = usuario;
+        _mostrarModalEliminarUsuario = true;
+    }
+
+    // Called from the modal to actually remove the user from the project
+    private async Task ConfirmarEliminarUsuarioAsync()
+    {
+        if (_proyectoParaEliminarUsuario == null || _usuarioSeleccionado == null)
+        {
+            Mostrar("Datos insuficientes para eliminar usuario.", true);
+            return;
+        }
+        var result = await ProyectoService.QuitarUsuarioDeProyectoAsync(_proyectoParaEliminarUsuario.Id, _usuarioSeleccionado.Id);
+        if (result.IsSuccess)
+        {
+            Mostrar($"Usuario '{_usuarioSeleccionado.Nombre}' removido del proyecto.", false);
+            _mostrarModalEliminarUsuario = false;
+            await CargarAsync();
+        }
+        else
+        {
+            Mostrar(result.Error.Mensaje, true);
+        }
+    }
+
+
 
 
     private async Task AsignarUsuarioAsync()
@@ -288,6 +391,8 @@ else
         }
 
 
+
+
         var result = await ProyectoService.AsignarUsuarioAProyectoAsync(_proyectoSeleccionado.Id, _usuarioIdParaAsignar);
         if (result.IsSuccess)
         {
@@ -296,12 +401,18 @@ else
             await CargarAsync();
         }
 
+
+
         else
         {
             Mostrar(result.Error.Mensaje, true);
         }
 
+
+
     }
+
+
 
 
     private async Task EliminarProyectoAsync(Guid proyectoId)
@@ -313,12 +424,18 @@ else
             await CargarAsync();
         }
 
+
+
         else
         {
             Mostrar(result.Error.Mensaje, true);
         }
 
+
+
     }
+
+
 
 
     private void Mostrar(string mensaje, bool error)
@@ -326,5 +443,7 @@ else
         _mensaje = mensaje;
         _esError = error;
     }
+
+
 
 }
