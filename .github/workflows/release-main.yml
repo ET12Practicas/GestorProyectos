@@ -1,0 +1,147 @@
+name: Release e imagen Docker
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# Serializar las publicaciones para asignar versiones sin colisiones.
+concurrency:
+  group: release-main
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publicar release y Docker
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Obtener el commit integrado y todo el historial
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+
+      - name: Calcular versión y preparar notas
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t all_tags < <(git tag --sort=-version:refname | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' || true)
+          mapfile -t current_tags < <(git tag --points-at HEAD --sort=-version:refname | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' || true)
+          latest_tag="${all_tags[0]:-}"
+          tag="${current_tags[0]:-}"
+
+          # Reutilizar la versión si se vuelve a ejecutar un merge ya publicado.
+          if [[ -z "$tag" ]]; then
+            if [[ -z "$latest_tag" ]]; then
+              tag="v1.0.0"
+            else
+              IFS='.' read -r major minor patch <<< "${latest_tag#v}"
+              tag="v$major.$minor.$((patch + 1))"
+            fi
+          fi
+
+          previous_tag=""
+          while IFS= read -r candidate; do
+            if [[ "$candidate" != "$tag" && "$candidate" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              previous_tag="$candidate"
+              break
+            fi
+          done < <(git tag --merged HEAD --sort=-version:refname)
+
+          range="HEAD"
+          if [[ -n "$previous_tag" ]]; then
+            range="$previous_tag..HEAD"
+          fi
+
+          image="ghcr.io/et12practicas/gestorproyectos"
+          publish_latest=true
+          if [[ -n "$latest_tag" && "$tag" != "$latest_tag" && "${current_tags[0]:-}" == "$tag" ]]; then
+            publish_latest=false
+          fi
+
+          notes_file="$RUNNER_TEMP/release-notes.md"
+          {
+            printf '## Cambios en %s\n\n' "$tag"
+            git log --reverse --format="- %s ([%h]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/%H))" "$range"
+            printf '\n## Imagen Docker\n\n`%s:%s`\n' "$image" "$tag"
+            if [[ -n "$previous_tag" ]]; then
+              printf '\n[Comparar versiones](%s/%s/compare/%s...%s)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$previous_tag" "$tag"
+            fi
+          } > "$notes_file"
+
+          {
+            echo "tag=$tag"
+            echo "version=${tag#v}"
+            echo "notes_file=$notes_file"
+            echo "publish_latest=$publish_latest"
+            echo "tags<<IMAGE_TAGS"
+            echo "$image:$tag"
+            if [[ "$publish_latest" == true ]]; then
+              echo "$image:latest"
+            fi
+            echo "IMAGE_TAGS"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compilar y publicar imagen
+        id: docker
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+          tags: ${{ steps.version.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ env.RELEASE_SHA }}
+            org.opencontainers.image.version=${{ steps.version.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Publicar el release solo cuando la imagen se haya construido y subido.
+      - name: Crear tag y release
+        shell: bash
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          NOTES_FILE: ${{ steps.version.outputs.notes_file }}
+          PUBLISH_LATEST: ${{ steps.version.outputs.publish_latest }}
+          IMAGE_DIGEST: ${{ steps.docker.outputs.digest }}
+        run: |
+          set -euo pipefail
+          printf '\nDigest: `%s`\n' "$IMAGE_DIGEST" >> "$NOTES_FILE"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "El release $TAG ya existe; se conserva la misma versión."
+          else
+            gh release create "$TAG" \
+              --target "$RELEASE_SHA" \
+              --title "$TAG" \
+              --notes-file "$NOTES_FILE" \
+              --latest="$PUBLISH_LATEST"
+          fi

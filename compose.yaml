@@ -1,0 +1,48 @@
+name: gestorproyectos
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__proyecto_db: "Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-gestorproyectos};User=${MYSQL_USER:-gestor};Password=${MYSQL_PASSWORD:?Defini MYSQL_PASSWORD en .env};"
+      Jwt__ClaveSecreta: "${JWT_SECRET:?Defini JWT_SECRET en .env}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-gestorproyectos}"
+      MYSQL_USER: "${MYSQL_USER:-gestor}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:?Defini MYSQL_PASSWORD en .env}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Defini MYSQL_ROOT_PASSWORD en .env}"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_PASSWORD}" mysql
+          --host=127.0.0.1
+          --user="$${MYSQL_USER}"
+          --database="$${MYSQL_DATABASE}"
+          --execute='SELECT 1'
+          --silent
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
