@@ -28,6 +28,13 @@ internal sealed class TicketRepository(ProyectoDbContext context) : ITicketRepos
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Ticket>> ObtenerTicketsDelUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
+    {
+        return await context.Tickets
+            .Where(ticket => ticket.UsuarioId == usuarioId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Ticket?> ObtenerTicketAsync(Guid ticketId, CancellationToken cancellationToken = default)
     {
         return await context.Tickets

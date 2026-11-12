@@ -7,7 +7,9 @@ public sealed class UsuarioEndpoints : ICarterModule
 {
     public void AddRoutes(IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/usuarios").WithTags("Usuarios");
+        var group = app.MapGroup("/api/usuarios")
+            .WithTags("Usuarios")
+            .RequireAuthorization();
 
         group.MapGet("/", async (IUsuarioService service, CancellationToken ct) =>
         {
@@ -20,8 +22,6 @@ public sealed class UsuarioEndpoints : ICarterModule
             var usuario = await service.ObtenerUsuarioPorIdAsync(usuarioId, ct);
             return usuario is not null ? Results.Ok(usuario) : Results.NotFound();
         });
-
-
 
         group.MapDelete("/{usuarioId:guid}", async (IUsuarioService service, Guid usuarioId, CancellationToken ct) =>
         {

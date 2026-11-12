@@ -19,6 +19,14 @@ internal sealed class UsuarioRepository(ProyectoDbContext context) : IUsuarioRep
             .FirstOrDefaultAsync(u => u.Id == usuarioId, cancellationToken);
     }
 
+    public async Task<Usuario?> ObtenerUsuarioConRelacionesAsync(Guid usuarioId, CancellationToken cancellationToken = default)
+    {
+        return await context.Usuarios
+            .Include(u => u.Proyectos)
+            .Include(u => u.ProyectosCreados)
+            .FirstOrDefaultAsync(u => u.Id == usuarioId, cancellationToken);
+    }
+
     public async Task<bool> ExisteUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
         return await context.Usuarios.AnyAsync(u => u.Id == usuarioId, cancellationToken);

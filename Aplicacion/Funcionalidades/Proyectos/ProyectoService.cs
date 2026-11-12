@@ -52,14 +52,19 @@ internal sealed class ProyectoService(
             return Result.Failure<Guid>(Error.Validation(primerError));
         }
 
-        var creadorId = dto.CreadorId ?? currentUserService.UsuarioId;
-        if (!creadorId.HasValue)
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
         {
             return Result.Failure<Guid>(Error.Unauthorized("Debes iniciar sesión para crear un proyecto."));
         }
 
-        var proyecto = new Proyecto(dto.Nombre.Trim(), creadorId.Value);
-        var creador = await usuarioRepository.ObtenerUsuarioAsync(creadorId.Value, cancellationToken);
+        if (dto.CreadorId.HasValue && dto.CreadorId.Value != usuarioActualId.Value)
+        {
+            return Result.Failure<Guid>(Error.Forbidden("No puedes crear un proyecto para otro usuario."));
+        }
+
+        var proyecto = new Proyecto(dto.Nombre.Trim(), usuarioActualId.Value);
+        var creador = await usuarioRepository.ObtenerUsuarioAsync(usuarioActualId.Value, cancellationToken);
         if (creador is not null)
         {
             proyecto.Usuarios.Add(creador);

@@ -154,11 +154,31 @@ a, .btn-link {
 .status-closed { color: #067647; background: #ecfdf3; }
 
 .status-select {
-    min-width: 135px;
+    min-width: 120px;
+    width: 100%;
+    max-width: 150px;
 }
 
 .responsable-select {
-    min-width: 190px;
+    min-width: 140px;
+    width: 100%;
+    max-width: 180px;
+}
+
+.kanban-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.55rem;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 0.65rem;
+    margin-top: 0.5rem;
+}
+
+.kanban-card-footer > * {
+    flex: 1 1 140px;
+    min-width: 0;
 }
 
 .empty-state {
@@ -376,15 +396,6 @@ h1:focus {
     color: #64748b;
     line-height: 1.4;
     margin-bottom: 0.75rem;
-}
-
-.kanban-card-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-top: 1px solid #f1f5f9;
-    padding-top: 0.65rem;
-    margin-top: 0.5rem;
 }
 
 .project-role-badge {

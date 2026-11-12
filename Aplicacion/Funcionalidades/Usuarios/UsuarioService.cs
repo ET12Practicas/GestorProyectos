@@ -15,6 +15,8 @@ public interface IUsuarioService
 
 internal sealed class UsuarioService(
     IUsuarioRepository usuarioRepository,
+    IProyectoRepository proyectoRepository,
+    ITicketRepository ticketRepository,
     IUnidadDeTrabajo unidadDeTrabajo) : IUsuarioService
 {
     public async Task<IReadOnlyList<UsuarioQueryDto>> ObtenerUsuariosAsync(CancellationToken cancellationToken = default)
@@ -29,14 +31,37 @@ internal sealed class UsuarioService(
         return usuario is null ? null : MapearUsuario(usuario);
     }
 
-    
-
     public async Task<Result> EliminarUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
-        var usuario = await usuarioRepository.ObtenerUsuarioAsync(usuarioId, cancellationToken);
+        var usuario = await usuarioRepository.ObtenerUsuarioConRelacionesAsync(usuarioId, cancellationToken);
         if (usuario is null)
         {
             return Result.Failure(Error.NotFound("Usuario no encontrado."));
+        }
+
+        var proyectosDelUsuario = await proyectoRepository.ObtenerProyectosDelUsuarioAsync(usuarioId, cancellationToken);
+        foreach (var proyecto in proyectosDelUsuario)
+        {
+            if (proyecto.CreadorId == usuarioId)
+            {
+                proyecto.CreadorId = null;
+                proyecto.Creador = null;
+            }
+
+            proyecto.Usuarios.RemoveAll(u => u.Id == usuarioId);
+
+            foreach (var ticket in proyecto.Tickets.Where(t => t.UsuarioId == usuarioId))
+            {
+                ticket.UsuarioTicket = null;
+                ticket.UsuarioId = null;
+            }
+        }
+
+        var ticketsDelUsuario = await ticketRepository.ObtenerTicketsDelUsuarioAsync(usuarioId, cancellationToken);
+        foreach (var ticket in ticketsDelUsuario)
+        {
+            ticket.UsuarioTicket = null;
+            ticket.UsuarioId = null;
         }
 
         usuarioRepository.EliminarUsuario(usuario);
