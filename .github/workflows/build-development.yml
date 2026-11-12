@@ -1,0 +1,30 @@
+name: Compilar development
+
+on:
+  push:
+    branches:
+      - development
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compilar solución
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v7
+
+      - name: Configurar .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restaurar dependencias
+        run: dotnet restore GestorProyecto.slnx
+
+      - name: Compilar en Release
+        run: dotnet build GestorProyecto.slnx --configuration Release --no-restore
