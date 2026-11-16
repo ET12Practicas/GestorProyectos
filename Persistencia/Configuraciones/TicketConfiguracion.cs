@@ -34,10 +34,5 @@ public sealed class TicketConfiguracion : IEntityTypeConfiguration<Ticket>
             .WithMany(p => p.Tickets)
             .HasForeignKey(t => t.ProyectoId)
             .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(t => t.Comentarios)
-            .WithOne(c => c.Ticket)
-            .HasForeignKey(c => c.TicketId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 }

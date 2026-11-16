@@ -18,7 +18,7 @@ public sealed class ProyectoEndpoints : ICarterModule
         {
             var proyectos = await service.ObtenerProyectosAsync(ct);
             return Results.Ok(proyectos);
-        }).RequireAuthorization();
+        }).RequireAuthorization("SoloAdministradores");
 
         group.MapGet("/mis-proyectos", async (
             ICurrentUserService currentUser,

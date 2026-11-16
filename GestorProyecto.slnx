@@ -3,4 +3,5 @@
   <Project Path="Dominio/Dominio.csproj" />
   <Project Path="Persistencia/Persistencia.csproj" />
   <Project Path="Presentacion/Presentacion.csproj" />
+  <Project Path="Tests/Tests.csproj" />
 </Solution>

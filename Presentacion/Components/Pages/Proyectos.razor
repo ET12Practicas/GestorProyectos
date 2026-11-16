@@ -187,25 +187,45 @@ else
                 </div>
                 <div class="modal-body py-4">
                     <p class="text-secondary small mb-3">
-                        Seleccioná un usuario registrado para sumarlo a <strong>@_proyectoSeleccionado.Nombre</strong>. Una vez sumado, podrá ver el proyecto y los tickets que le asignes.
+                        Buscá a un usuario por su dirección de email para sumarlo a <strong>@_proyectoSeleccionado.Nombre</strong>.
                     </p>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Seleccionar Usuario</label>
-                        <select class="form-select py-2" @bind="_usuarioIdParaAsignar">
-                            <option value="@Guid.Empty">Elegí una persona...</option>
-                            @foreach (var usuario in _usuariosDisponibles)
-                            {
-                                <option value="@usuario.Id">@usuario.Nombre</option>
-                            }
-
-
-
-                        </select>
+                        <label class="form-label fw-semibold">Email del usuario</label>
+                        <div class="input-group">
+                            <input type="email" class="form-control" placeholder="ejemplo@correo.com"
+                                   @bind="_emailParaBuscar" @bind:event="oninput"
+                                   @onkeydown="@(async e => { if (e.Key == "Enter") await BuscarUsuarioPorEmailAsync(); })" />
+                            <button class="btn btn-outline-primary" type="button" @onclick="BuscarUsuarioPorEmailAsync" disabled="@_buscandoUsuario">
+                                @if (_buscandoUsuario)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                }
+                                else
+                                {
+                                    <span>Buscar</span>
+                                }
+                            </button>
+                        </div>
                     </div>
+
+                    @if (_mensajeBusqueda is not null)
+                    {
+                        <div class="alert alert-info py-2 small mb-3">@_mensajeBusqueda</div>
+                    }
+
+                    @if (_usuarioEncontrado is not null)
+                    {
+                        <div class="alert alert-success d-flex align-items-center justify-content-between py-2 mb-0">
+                            <div>
+                                <strong>Encontrado:</strong> @_usuarioEncontrado.Nombre
+                            </div>
+                            <span class="badge bg-success">Listo para invitar</span>
+                        </div>
+                    }
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-light" @onclick="() => _mostrarModalUsuario = false">Cancelar</button>
-                    <button type="button" class="btn btn-primary px-4" @onclick="AsignarUsuarioAsync">Sumar al Proyecto</button>
+                    <button type="button" class="btn btn-primary px-4" @onclick="AsignarUsuarioAsync" disabled="@(_usuarioEncontrado is null)">Invitar al Proyecto</button>
                 </div>
             </div>
         </div>
@@ -239,7 +259,6 @@ else
 
 @code {
     private IReadOnlyList<ProyectoQueryDto> _proyectos = [];
-    private IReadOnlyList<UsuarioQueryDto> _usuarios = [];
     private ProyectoCommandDto _nuevoProyecto = new() { Nombre = string.Empty };
     
     private bool _cargando;
@@ -252,7 +271,10 @@ else
     private ProyectoQueryDto? _proyectoParaEliminarUsuario;
     private UsuarioQueryDto? _usuarioSeleccionado;
     private ProyectoQueryDto? _proyectoSeleccionado;
-    private Guid _usuarioIdParaAsignar;
+    private string _emailParaBuscar = string.Empty;
+    private bool _buscandoUsuario;
+    private UsuarioQueryDto? _usuarioEncontrado;
+    private string? _mensajeBusqueda;
 
     protected override async Task OnInitializedAsync() => await CargarAsync();
 
@@ -268,53 +290,25 @@ else
                 // Regla de privacidad: solo traemos los proyectos del usuario autenticado (creados o invitado)
                 _proyectos = await ProyectoService.ObtenerProyectosDelUsuarioAsync(usuarioId.Value);
             }
-
-
-
             else
             {
                 _proyectos = [];
             }
-
-
-
-
-            _usuarios = await UsuarioService.ObtenerUsuariosAsync();
         }
-
-
-
         catch (Exception ex)
         {
             Mostrar($"No se pudieron cargar los proyectos: {ex.Message}", true);
         }
-
-
-
         finally
         {
             _cargando = false;
         }
-
-
-
     }
-
-
-
 
     private bool EsCreadorDelProyecto(ProyectoQueryDto proyecto)
     {
         return CurrentUserService.UsuarioId.HasValue && proyecto.CreadorId == CurrentUserService.UsuarioId.Value;
     }
-
-
-
-
-    private IEnumerable<UsuarioQueryDto> _usuariosDisponibles =>
-        _proyectoSeleccionado is null
-            ? _usuarios
-            : _usuarios.Where(u => !_proyectoSeleccionado.Usuarios.Any(pu => pu.Id == u.Id));
 
     private async Task CrearProyectoAsync()
     {
@@ -346,8 +340,49 @@ else
     private void AbrirModalSumarUsuario(ProyectoQueryDto proyecto)
     {
         _proyectoSeleccionado = proyecto;
-        _usuarioIdParaAsignar = Guid.Empty;
+        _emailParaBuscar = string.Empty;
+        _usuarioEncontrado = null;
+        _mensajeBusqueda = null;
         _mostrarModalUsuario = true;
+    }
+
+    private async Task BuscarUsuarioPorEmailAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_emailParaBuscar))
+        {
+            _mensajeBusqueda = "Ingresá un email para buscar.";
+            _usuarioEncontrado = null;
+            return;
+        }
+
+        _buscandoUsuario = true;
+        _mensajeBusqueda = null;
+        _usuarioEncontrado = null;
+
+        try
+        {
+            var encontrado = await UsuarioService.ObtenerUsuarioPorEmailAsync(_emailParaBuscar.Trim());
+            if (encontrado is null)
+            {
+                _mensajeBusqueda = "No se encontró ningún usuario con ese email.";
+            }
+            else if (_proyectoSeleccionado is not null && _proyectoSeleccionado.Usuarios.Any(u => u.Id == encontrado.Id))
+            {
+                _mensajeBusqueda = $"'{encontrado.Nombre}' ya forma parte de este proyecto.";
+            }
+            else
+            {
+                _usuarioEncontrado = encontrado;
+            }
+        }
+        catch (Exception ex)
+        {
+            _mensajeBusqueda = $"Error al buscar: {ex.Message}";
+        }
+        finally
+        {
+            _buscandoUsuario = false;
+        }
     }
 
     // Open the delete‑user confirmation modal (owner only)
@@ -379,37 +414,27 @@ else
         }
     }
 
-
-
-
     private async Task AsignarUsuarioAsync()
     {
-        if (_proyectoSeleccionado is null || _usuarioIdParaAsignar == Guid.Empty)
+        if (_proyectoSeleccionado is null || _usuarioEncontrado is null)
         {
-            Mostrar("Seleccioná un usuario válido.", true);
+            Mostrar("Buscá y seleccioná un usuario válido.", true);
             return;
         }
 
-
-
-
-        var result = await ProyectoService.AsignarUsuarioAProyectoAsync(_proyectoSeleccionado.Id, _usuarioIdParaAsignar);
+        var result = await ProyectoService.AsignarUsuarioAProyectoAsync(_proyectoSeleccionado.Id, _usuarioEncontrado.Id);
         if (result.IsSuccess)
         {
-            Mostrar("Usuario sumado al equipo del proyecto.", false);
+            Mostrar($"'{_usuarioEncontrado.Nombre}' fue sumado al equipo del proyecto.", false);
             _mostrarModalUsuario = false;
+            _usuarioEncontrado = null;
+            _emailParaBuscar = string.Empty;
             await CargarAsync();
         }
-
-
-
         else
         {
             Mostrar(result.Error.Mensaje, true);
         }
-
-
-
     }
 
 

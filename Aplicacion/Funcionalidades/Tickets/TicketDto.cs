@@ -1,5 +1,4 @@
 using Dominio.Enums;
-using Aplicacion.Funcionalidades.Comentarios;
 using Aplicacion.Funcionalidades.Usuarios;
 
 namespace Aplicacion.Funcionalidades.Tickets;
@@ -22,6 +21,5 @@ public sealed class TicketQueryDto
     public string Descripcion { get; set; } = string.Empty;
     public UsuarioQueryDto? Usuario { get; set; }
     public EEstadoTicket Estado { get; set; } = EEstadoTicket.Abierto;
-    public List<ComentarioQueryDto> Comentarios { get; set; } = [];
     public DateTime Fecha { get; set; }
 }

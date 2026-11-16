@@ -1,10 +1,12 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Aplicacion;
 using Aplicacion.Abstracciones;
 using Dominio.Entidades;
 using Aplicacion.Funcionalidades.Auth;
 using Carter;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -31,7 +33,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Gestor de Proyectos API",
         Version = "v1",
-        Description = "API de gestión de proyectos, tickets y comentarios con soporte híbrido de autenticación (JWT y Cookies de Identity)."
+        Description = "API de gestión de proyectos y tickets con soporte híbrido de autenticación (JWT y Cookies de Identity)."
     });
 
     var securityScheme = new OpenApiSecurityScheme
@@ -63,15 +65,24 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-var connectionString = builder.Configuration.GetConnectionString("proyecto_db")
-    ?? throw new InvalidOperationException(
-        "No se configuró la cadena de conexión 'proyecto_db'.");
+var connectionString = builder.Configuration.GetConnectionString("proyecto_db");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "No se configuró la cadena de conexión 'proyecto_db'. Definila mediante user-secrets o la variable de entorno ConnectionStrings__proyecto_db.");
+}
 
 builder.Services.AddPersistencia(connectionString);
 
 // Autenticación híbrida: Cookies de Identity + JWT Bearer
 var jwtSection = builder.Configuration.GetSection("Jwt");
-var secretKey = jwtSection["ClaveSecreta"] ?? "ClaveSecretaSuperSeguraParaGestorProyectos2026!#*JWTKey_Min32Chars";
+var secretKey = jwtSection["ClaveSecreta"];
+if (string.IsNullOrWhiteSpace(secretKey))
+{
+    throw new InvalidOperationException(
+        "No se configuró 'Jwt:ClaveSecreta'. Definila mediante user-secrets o la variable de entorno Jwt__ClaveSecreta.");
+}
+
 var keyBytes = Encoding.UTF8.GetBytes(secretKey);
 
 builder.Services.AddAuthentication(options =>
@@ -105,6 +116,9 @@ builder.Services.AddIdentityCore<Usuario>(options =>
     options.Password.RequireUppercase = false;
     options.Password.RequireLowercase = false;
     options.User.RequireUniqueEmail = true;
+    options.Lockout.AllowedForNewUsers = true;
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
 })
 .AddRoles<IdentityRole<Guid>>()
 .AddEntityFrameworkStores<ProyectoDbContext>()
@@ -113,16 +127,68 @@ builder.Services.AddIdentityCore<Usuario>(options =>
 
 builder.Services.AddAuthorization(options =>
 {
-    options.DefaultPolicy = new AuthorizationPolicyBuilder(
-        JwtBearerDefaults.AuthenticationScheme,
-        IdentityConstants.ApplicationScheme)
+    // Ambas políticas aceptan los dos esquemas (JWT Bearer y Cookie de Identity)
+    var esquemaDoble = new[] { JwtBearerDefaults.AuthenticationScheme, IdentityConstants.ApplicationScheme };
+    options.AddPolicy("SoloAdministradores", p =>
+        p.AddAuthenticationSchemes(esquemaDoble).RequireRole("Administrador"));
+    options.DefaultPolicy = new AuthorizationPolicyBuilder(esquemaDoble)
         .RequireAuthenticatedUser()
         .Build();
 });
 
+// Las rutas de API devuelven 401/403 en lugar de redirigir al login del navegador
+builder.Services.PostConfigure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme, options =>
+{
+    options.Events.OnRedirectToLogin = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        }
+
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Se escribe el cuerpo en el rechazo para que UseStatusCodePagesWithReExecute no re-ejecute el pipeline.
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsync(
+            """{"error":"Demasiados intentos. Esperá un momento y volvé a probar."}""",
+            cancellationToken);
+    };
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "desconocida",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+
 var app = builder.Build();
 
-await app.Services.InicializarBaseDeDatosAsync();
+await app.Services.InicializarBaseDeDatosAsync(app.Environment.IsDevelopment());
 
 if (app.Environment.IsDevelopment())
 {
@@ -137,6 +203,7 @@ else
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -3,14 +3,17 @@ using System.Security.Claims;
 using System.Text;
 using Dominio.Entidades;
 using Aplicacion.Funcionalidades.Auth;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Presentacion.Servicios;
 
-public sealed class TokenService(IConfiguration configuration) : ITokenService
+public sealed class TokenService(IConfiguration configuration, UserManager<Usuario> userManager) : ITokenService
 {
-    public (string Token, DateTime ExpiraEn) GenerarToken(Usuario usuario)
+    public async Task<(string Token, DateTime ExpiraEn)> GenerarTokenAsync(Usuario usuario)
     {
+        var roles = await userManager.GetRolesAsync(usuario);
+
         var jwtSettings = configuration.GetSection("Jwt");
         var claveSecreta = jwtSettings["ClaveSecreta"]
             ?? throw new InvalidOperationException("No se configuró 'Jwt:ClaveSecreta' en appsettings.json.");
@@ -30,6 +33,8 @@ public sealed class TokenService(IConfiguration configuration) : ITokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(JwtRegisteredClaimNames.Sub, usuario.Id.ToString())
         };
+
+        claims.AddRange(roles.Select(rol => new Claim(ClaimTypes.Role, rol)));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(claveSecreta));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

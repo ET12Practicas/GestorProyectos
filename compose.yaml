@@ -12,6 +12,7 @@ services:
       ASPNETCORE_HTTP_PORTS: "8080"
       ConnectionStrings__proyecto_db: "Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-gestorproyectos};User=${MYSQL_USER:-gestor};Password=${MYSQL_PASSWORD:?Defini MYSQL_PASSWORD en .env};"
       Jwt__ClaveSecreta: "${JWT_SECRET:?Defini JWT_SECRET en .env}"
+      Administracion__EmailsAdministradores__0: "${ADMIN_EMAILS:-admin@ejemplo.com}"
     depends_on:
       mysql:
         condition: service_healthy

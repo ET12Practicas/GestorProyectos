@@ -12,8 +12,6 @@ internal sealed class TicketRepository(ProyectoDbContext context) : ITicketRepos
             .AsNoTracking()
             .Include(ticket => ticket.UsuarioTicket)
             .Include(ticket => ticket.ProyectoTicket)
-            .Include(ticket => ticket.Comentarios)
-                .ThenInclude(comentario => comentario.UsuarioComentario)
             .ToListAsync(cancellationToken);
     }
 
@@ -23,8 +21,6 @@ internal sealed class TicketRepository(ProyectoDbContext context) : ITicketRepos
             .AsNoTracking()
             .Where(ticket => ticket.ProyectoId == proyectoId)
             .Include(ticket => ticket.UsuarioTicket)
-            .Include(ticket => ticket.Comentarios)
-                .ThenInclude(comentario => comentario.UsuarioComentario)
             .ToListAsync(cancellationToken);
     }
 
@@ -48,8 +44,6 @@ internal sealed class TicketRepository(ProyectoDbContext context) : ITicketRepos
         return await context.Tickets
             .Include(ticket => ticket.UsuarioTicket)
             .Include(ticket => ticket.ProyectoTicket)
-            .Include(ticket => ticket.Comentarios)
-                .ThenInclude(comentario => comentario.UsuarioComentario)
             .FirstOrDefaultAsync(ticket => ticket.Id == ticketId, cancellationToken);
     }
 

@@ -15,7 +15,6 @@ GestorProyectos/
 ├── Dominio/
 │   ├── Dominio.csproj
 │   ├── Entidades/
-│   │   ├── Comentario.cs
 │   │   ├── Proyecto.cs
 │   │   ├── Ticket.cs
 │   │   └── Usuario.cs
@@ -27,7 +26,6 @@ GestorProyectos/
 │   ├── Comun/                     # Resultados y errores de los casos de uso
 │   ├── Funcionalidades/
 │   │   ├── Auth/                  # DTO, validadores y contratos de autenticación
-│   │   ├── Comentarios/           # DTO, validadores y servicios de comentarios
 │   │   ├── Proyectos/             # DTO, validadores y servicios de proyectos
 │   │   ├── Tickets/               # DTO, validadores y servicios de tickets
 │   │   └── Usuarios/              # DTO, validadores y servicios de usuarios
@@ -78,10 +76,22 @@ conserva su integración con ASP.NET Core Identity.
 
 ## Ejecución
 
-1. Configurar `ConnectionStrings:proyecto_db` en
-   `Presentacion/appsettings.json` o mediante secretos de usuario.
-2. Ejecutar `dotnet run --project Presentacion`.
-3. En desarrollo, Swagger queda disponible en `/swagger`.
+`appsettings.json` no contiene secretos: la cadena de conexión y la clave JWT se
+leen de user-secrets o variables de entorno, y la aplicación falla al arrancar si
+faltan. En cada máquina hay que configurarlos una vez:
+
+```bash
+dotnet user-secrets --project Presentacion set "ConnectionStrings:proyecto_db" "server=localhost;database=5to_gestorproyectos;user=TU_USUARIO;password=TU_CLAVE"
+dotnet user-secrets --project Presentacion set "Jwt:ClaveSecreta" "TU_CLAVE_ALEATORIA_DE_32_O_MAS_CARACTERES"
+dotnet user-secrets --project Presentacion set "Administracion:EmailsAdministradores:0" "admin@tu-dominio.com"
+```
+
+1. Con los secretos cargados, ejecutar `dotnet run --project Presentacion`.
+2. La base se crea/actualiza automáticamente al iniciar (migraciones).
+3. El email configurado en `Administracion:EmailsAdministradores` recibe el rol
+   `Administrador` al arrancar, pero solo si el usuario ya existe: registralo
+   primero y reiniciá la aplicación.
+4. En desarrollo, Swagger queda disponible en `/swagger`.
 
 ## Releases e imagen Docker
 

@@ -9,7 +9,7 @@ public interface IUsuarioService
 {
     Task<IReadOnlyList<UsuarioQueryDto>> ObtenerUsuariosAsync(CancellationToken cancellationToken = default);
     Task<UsuarioQueryDto?> ObtenerUsuarioPorIdAsync(Guid usuarioId, CancellationToken cancellationToken = default);
-
+    Task<UsuarioQueryDto?> ObtenerUsuarioPorEmailAsync(string email, CancellationToken cancellationToken = default);
     Task<Result> EliminarUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default);
 }
 
@@ -17,10 +17,16 @@ internal sealed class UsuarioService(
     IUsuarioRepository usuarioRepository,
     IProyectoRepository proyectoRepository,
     ITicketRepository ticketRepository,
-    IUnidadDeTrabajo unidadDeTrabajo) : IUsuarioService
+    IUnidadDeTrabajo unidadDeTrabajo,
+    ICurrentUserService currentUserService) : IUsuarioService
 {
     public async Task<IReadOnlyList<UsuarioQueryDto>> ObtenerUsuariosAsync(CancellationToken cancellationToken = default)
     {
+        if (!currentUserService.EsAdministrador)
+        {
+            return [];
+        }
+
         var usuarios = await usuarioRepository.ObtenerUsuariosAsync(cancellationToken);
         return usuarios.Select(MapearUsuario).ToList();
     }
@@ -31,8 +37,30 @@ internal sealed class UsuarioService(
         return usuario is null ? null : MapearUsuario(usuario);
     }
 
+    public async Task<UsuarioQueryDto?> ObtenerUsuarioPorEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        var normalizado = email.Trim().ToUpperInvariant();
+        var usuario = await usuarioRepository.ObtenerUsuarioPorEmailAsync(normalizado, cancellationToken);
+        return usuario is null ? null : MapearUsuario(usuario);
+    }
+
     public async Task<Result> EliminarUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
+        if (!currentUserService.EsAdministrador)
+        {
+            return Result.Failure(Error.Forbidden("Solo un administrador puede realizar esta acción."));
+        }
+
+        if (currentUserService.UsuarioId.HasValue && usuarioId == currentUserService.UsuarioId.Value)
+        {
+            return Result.Failure(Error.Conflict("No podés eliminar tu propia cuenta de administrador."));
+        }
+
         var usuario = await usuarioRepository.ObtenerUsuarioConRelacionesAsync(usuarioId, cancellationToken);
         if (usuario is null)
         {

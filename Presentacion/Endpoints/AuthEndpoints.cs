@@ -4,6 +4,8 @@ using Dominio.Entidades;
 using Aplicacion.Funcionalidades.Auth;
 using Carter;
 using FluentValidation;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 
 namespace Presentacion.Endpoints;
@@ -23,7 +25,7 @@ public sealed class AuthEndpoints : ICarterModule
             return result.IsSuccess 
                 ? Results.Ok(new { mensaje = result.Value }) 
                 : result.ToHttpResult();
-        });
+        }).RequireRateLimiting("auth");
 
         group.MapPost("/login", async (
             IAuthService authService,
@@ -32,7 +34,7 @@ public sealed class AuthEndpoints : ICarterModule
         {
             var result = await authService.IniciarSesionAsync(dto, ct);
             return result.ToHttpResult();
-        });
+        }).RequireRateLimiting("auth");
 
         group.MapPost("/logout", async (IAuthService authService) =>
         {
@@ -44,8 +46,14 @@ public sealed class AuthEndpoints : ICarterModule
         app.MapPost("/auth/login-cookie", async (
             HttpContext context,
             SignInManager<Usuario> signInManager,
-            UserManager<Usuario> userManager) =>
+            UserManager<Usuario> userManager,
+            IAntiforgery antiforgery) =>
         {
+            if (!await EsSolicitudAntiforgeryValidaAsync(context, antiforgery))
+            {
+                return Results.Redirect("/login?error=antiforgery");
+            }
+
             var form = await context.Request.ReadFormAsync();
             var email = form["email"].ToString().Trim();
             var password = form["password"].ToString();
@@ -66,7 +74,12 @@ public sealed class AuthEndpoints : ICarterModule
                 usuario,
                 password,
                 isPersistent: recordarme,
-                lockoutOnFailure: false);
+                lockoutOnFailure: true);
+
+            if (result.IsLockedOut)
+            {
+                return Results.Redirect("/login?error=bloqueado");
+            }
 
             if (!result.Succeeded)
             {
@@ -74,13 +87,19 @@ public sealed class AuthEndpoints : ICarterModule
             }
 
             return Results.Redirect("/");
-        }).DisableAntiforgery();
+        }).RequireRateLimiting("auth");
 
         // Endpoint para procesar el Registro desde el formulario Blazor con Cookie
         app.MapPost("/auth/registro-cookie", async (
             HttpContext context,
-            IAuthService authService) =>
+            IAuthService authService,
+            IAntiforgery antiforgery) =>
         {
+            if (!await EsSolicitudAntiforgeryValidaAsync(context, antiforgery))
+            {
+                return Results.Redirect("/registro?error=antiforgery");
+            }
+
             var form = await context.Request.ReadFormAsync();
             var nombre = form["nombre"].ToString().Trim();
             var email = form["email"].ToString().Trim();
@@ -110,7 +129,7 @@ public sealed class AuthEndpoints : ICarterModule
 
             // Al registrarse exitosamente, lo redirigimos a login
             return Results.Redirect("/login");
-        }).DisableAntiforgery();
+        }).RequireRateLimiting("auth");
 
         // Endpoint para cerrar sesión desde el navegador (form POST directo)
         app.MapPost("/auth/logout", async (IAuthService authService) =>
@@ -141,5 +160,18 @@ public sealed class AuthEndpoints : ICarterModule
                 Email = usuario.Email ?? string.Empty
             });
         }).RequireAuthorization();
+    }
+
+    private static async Task<bool> EsSolicitudAntiforgeryValidaAsync(HttpContext context, IAntiforgery antiforgery)
+    {
+        try
+        {
+            await antiforgery.ValidateRequestAsync(context);
+            return true;
+        }
+        catch (AntiforgeryValidationException)
+        {
+            return false;
+        }
     }
 }

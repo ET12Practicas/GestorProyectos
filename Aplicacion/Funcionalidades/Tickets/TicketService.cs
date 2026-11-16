@@ -2,7 +2,6 @@ using Aplicacion.Abstracciones;
 using Aplicacion.Comun;
 using Dominio.Entidades;
 using Dominio.Enums;
-using Aplicacion.Funcionalidades.Comentarios;
 using Aplicacion.Funcionalidades.Usuarios;
 using FluentValidation;
 
@@ -30,6 +29,11 @@ internal sealed class TicketService(
 {
     public async Task<IReadOnlyList<TicketQueryDto>> ObtenerTicketsAsync(CancellationToken cancellationToken = default)
     {
+        if (!currentUserService.EsAdministrador)
+        {
+            return [];
+        }
+
         var tickets = await ticketRepository.ObtenerTicketsConDetallesAsync(cancellationToken);
         return tickets.Select(MapearTicket).ToList();
     }
@@ -37,17 +41,54 @@ internal sealed class TicketService(
     public async Task<TicketQueryDto?> ObtenerTicketPorIdAsync(Guid ticketId, CancellationToken cancellationToken = default)
     {
         var ticket = await ticketRepository.ObtenerTicketConDetallesAsync(ticketId, cancellationToken);
-        return ticket is null ? null : MapearTicket(ticket);
+        if (ticket is null || !await TieneAccesoAlTicketAsync(ticket, cancellationToken))
+        {
+            return null;
+        }
+
+        return MapearTicket(ticket);
     }
 
     public async Task<IReadOnlyList<TicketQueryDto>> ObtenerTicketsPorProyectoAsync(Guid proyectoId, CancellationToken cancellationToken = default)
     {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
+        {
+            return [];
+        }
+
+        if (!currentUserService.EsAdministrador)
+        {
+            var esMiembro = await proyectoRepository.EsMiembroDelProyectoAsync(proyectoId, usuarioActualId.Value, cancellationToken);
+            if (!esMiembro)
+            {
+                return [];
+            }
+        }
+
         var tickets = await ticketRepository.ObtenerTicketsPorProyectoAsync(proyectoId, cancellationToken);
         return tickets.Select(MapearTicket).ToList();
     }
 
+    private async Task<bool> TieneAccesoAlTicketAsync(Ticket ticket, CancellationToken cancellationToken)
+    {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue) return false;
+        if (currentUserService.EsAdministrador) return true;
+        if (ticket.ProyectoTicket?.CreadorId == usuarioActualId.Value) return true;
+
+        if (ticket.ProyectoId is not { } proyectoIdDelTicket) return false;
+        return await proyectoRepository.EsMiembroDelProyectoAsync(proyectoIdDelTicket, usuarioActualId.Value, cancellationToken);
+    }
+
     public async Task<Result<Guid>> CrearTicketAsync(Guid proyectoId, TicketCommandDto dto, CancellationToken cancellationToken = default)
     {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
+        {
+            return Result.Failure<Guid>(Error.Unauthorized("Debes iniciar sesión."));
+        }
+
         var validacion = await validator.ValidateAsync(dto, cancellationToken);
         if (!validacion.IsValid)
         {
@@ -62,9 +103,7 @@ internal sealed class TicketService(
         }
 
         // Regla: Solo el creador del proyecto puede crear tickets en él
-        if (currentUserService.IsAuthenticated &&
-            proyecto.CreadorId.HasValue &&
-            currentUserService.UsuarioId != proyecto.CreadorId)
+        if (proyecto.CreadorId != usuarioActualId)
         {
             return Result.Failure<Guid>(Error.Forbidden("Solo el creador del proyecto puede agregar nuevos tickets."));
         }
@@ -84,6 +123,12 @@ internal sealed class TicketService(
 
     public async Task<Result> CambiarEstadoTicketAsync(Guid ticketId, EstadoTicketDto dto, CancellationToken cancellationToken = default)
     {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
+        {
+            return Result.Failure(Error.Unauthorized("Debes iniciar sesión."));
+        }
+
         if (!Enum.IsDefined(dto.Estado))
         {
             return Result.Failure(Error.Validation("El estado proporcionado no es válido."));
@@ -97,16 +142,12 @@ internal sealed class TicketService(
 
         // Regla: El creador del proyecto puede cambiar el estado de cualquier ticket de su proyecto.
         // Los colaboradores invitados solo pueden cambiar el estado del ticket si lo tienen asignado.
-        if (currentUserService.IsAuthenticated)
-        {
-            var userId = currentUserService.UsuarioId;
-            var esCreador = ticket.ProyectoTicket?.CreadorId == userId;
-            var esAsignado = ticket.UsuarioId == userId;
+        var esCreador = ticket.ProyectoTicket?.CreadorId == usuarioActualId;
+        var esAsignado = ticket.UsuarioId == usuarioActualId;
 
-            if (!esCreador && !esAsignado)
-            {
-                return Result.Failure(Error.Forbidden("Solo el creador del proyecto o el usuario asignado al ticket pueden cambiar su estado."));
-            }
+        if (!esCreador && !esAsignado)
+        {
+            return Result.Failure(Error.Forbidden("Solo el creador del proyecto o el usuario asignado al ticket pueden cambiar su estado."));
         }
 
         ticket.Estado = dto.Estado;
@@ -116,6 +157,12 @@ internal sealed class TicketService(
 
     public async Task<Result> AsignarUsuarioATicketAsync(Guid ticketId, Guid usuarioId, CancellationToken cancellationToken = default)
     {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
+        {
+            return Result.Failure(Error.Unauthorized("Debes iniciar sesión."));
+        }
+
         var ticket = await ticketRepository.ObtenerTicketAsync(ticketId, cancellationToken);
         if (ticket is null)
         {
@@ -123,9 +170,7 @@ internal sealed class TicketService(
         }
 
         // Regla: Solo el creador del proyecto puede asignar responsables a los tickets
-        if (currentUserService.IsAuthenticated &&
-            ticket.ProyectoTicket?.CreadorId.HasValue == true &&
-            currentUserService.UsuarioId != ticket.ProyectoTicket.CreadorId)
+        if (ticket.ProyectoTicket?.CreadorId != usuarioActualId)
         {
             return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede asignar responsables a los tickets."));
         }
@@ -149,6 +194,12 @@ internal sealed class TicketService(
 
     public async Task<Result> DesasignarUsuarioDeTicketAsync(Guid ticketId, CancellationToken cancellationToken = default)
     {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
+        {
+            return Result.Failure(Error.Unauthorized("Debes iniciar sesión."));
+        }
+
         var ticket = await ticketRepository.ObtenerTicketAsync(ticketId, cancellationToken);
         if (ticket is null)
         {
@@ -156,9 +207,7 @@ internal sealed class TicketService(
         }
 
         // Regla: Solo el creador del proyecto puede desasignar responsables
-        if (currentUserService.IsAuthenticated &&
-            ticket.ProyectoTicket?.CreadorId.HasValue == true &&
-            currentUserService.UsuarioId != ticket.ProyectoTicket.CreadorId)
+        if (ticket.ProyectoTicket?.CreadorId != usuarioActualId)
         {
             return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede desasignar responsables."));
         }
@@ -171,10 +220,21 @@ internal sealed class TicketService(
 
     public async Task<Result> EliminarTicketAsync(Guid ticketId, CancellationToken cancellationToken = default)
     {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
+        {
+            return Result.Failure(Error.Unauthorized("Debes iniciar sesión."));
+        }
+
         var ticket = await ticketRepository.ObtenerTicketAsync(ticketId, cancellationToken);
         if (ticket is null)
         {
             return Result.Failure(Error.NotFound("Ticket no encontrado."));
+        }
+
+        if (ticket.ProyectoTicket?.CreadorId != usuarioActualId)
+        {
+            return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede eliminar este ticket."));
         }
 
         ticketRepository.EliminarTicket(ticket);
@@ -193,10 +253,7 @@ internal sealed class TicketService(
             Fecha = ticket.FechaTicket,
             Usuario = ticket.UsuarioTicket is null
                 ? null
-                : UsuarioService.MapearUsuario(ticket.UsuarioTicket),
-            Comentarios = ticket.Comentarios
-                .Select(ComentarioService.MapearComentario)
-                .ToList()
+                : UsuarioService.MapearUsuario(ticket.UsuarioTicket)
         };
     }
 }

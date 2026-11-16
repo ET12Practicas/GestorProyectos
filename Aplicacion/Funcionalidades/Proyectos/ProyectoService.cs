@@ -27,12 +27,22 @@ internal sealed class ProyectoService(
 {
     public async Task<IReadOnlyList<ProyectoQueryDto>> ObtenerProyectosAsync(CancellationToken cancellationToken = default)
     {
+        if (!currentUserService.EsAdministrador)
+        {
+            return [];
+        }
+
         var proyectos = await proyectoRepository.ObtenerProyectosConDetallesAsync(cancellationToken);
         return proyectos.Select(MapearProyecto).ToList();
     }
 
     public async Task<IReadOnlyList<ProyectoQueryDto>> ObtenerProyectosDelUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
+        if (!PuedeVerUsuario(usuarioId))
+        {
+            return [];
+        }
+
         var proyectos = await proyectoRepository.ObtenerProyectosDelUsuarioAsync(usuarioId, cancellationToken);
         return proyectos.Select(MapearProyecto).ToList();
     }
@@ -40,7 +50,12 @@ internal sealed class ProyectoService(
     public async Task<ProyectoQueryDto?> ObtenerProyectoPorIdAsync(Guid proyectoId, CancellationToken cancellationToken = default)
     {
         var proyecto = await proyectoRepository.ObtenerProyectoAsync(proyectoId, cancellationToken);
-        return proyecto is null ? null : MapearProyecto(proyecto);
+        if (proyecto is null || !TieneAccesoAlProyecto(proyecto))
+        {
+            return null;
+        }
+
+        return MapearProyecto(proyecto);
     }
 
     public async Task<Result<Guid>> CrearProyectoAsync(ProyectoCommandDto dto, CancellationToken cancellationToken = default)
@@ -78,6 +93,12 @@ internal sealed class ProyectoService(
 
     public async Task<Result> AsignarUsuarioAProyectoAsync(Guid proyectoId, Guid usuarioId, CancellationToken cancellationToken = default)
     {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
+        {
+            return Result.Failure(Error.Unauthorized("Debes iniciar sesión."));
+        }
+
         var proyecto = await proyectoRepository.ObtenerProyectoAsync(proyectoId, cancellationToken);
         if (proyecto is null)
         {
@@ -85,9 +106,7 @@ internal sealed class ProyectoService(
         }
 
         // Regla: Solo el creador del proyecto puede asignar nuevos usuarios
-        if (currentUserService.IsAuthenticated &&
-            proyecto.CreadorId.HasValue &&
-            currentUserService.UsuarioId != proyecto.CreadorId)
+        if (proyecto.CreadorId != usuarioActualId)
         {
             return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede asignar usuarios a este proyecto."));
         }
@@ -110,6 +129,12 @@ internal sealed class ProyectoService(
 
     public async Task<Result> QuitarUsuarioDeProyectoAsync(Guid proyectoId, Guid usuarioId, CancellationToken cancellationToken = default)
     {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
+        {
+            return Result.Failure(Error.Unauthorized("Debes iniciar sesión."));
+        }
+
         var proyecto = await proyectoRepository.ObtenerProyectoAsync(proyectoId, cancellationToken);
         if (proyecto is null)
         {
@@ -117,10 +142,7 @@ internal sealed class ProyectoService(
         }
 
         // Regla: Solo el creador del proyecto puede quitar usuarios (o el mismo usuario saliendo)
-        if (currentUserService.IsAuthenticated &&
-            proyecto.CreadorId.HasValue &&
-            currentUserService.UsuarioId != proyecto.CreadorId &&
-            currentUserService.UsuarioId != usuarioId)
+        if (proyecto.CreadorId != usuarioActualId && usuarioActualId != usuarioId)
         {
             return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede quitar colaboradores."));
         }
@@ -145,6 +167,12 @@ internal sealed class ProyectoService(
 
     public async Task<Result> EliminarProyectoAsync(Guid proyectoId, CancellationToken cancellationToken = default)
     {
+        var usuarioActualId = currentUserService.UsuarioId;
+        if (!usuarioActualId.HasValue)
+        {
+            return Result.Failure(Error.Unauthorized("Debes iniciar sesión."));
+        }
+
         var proyecto = await proyectoRepository.ObtenerProyectoAsync(proyectoId, cancellationToken);
         if (proyecto is null)
         {
@@ -152,9 +180,7 @@ internal sealed class ProyectoService(
         }
 
         // Regla: Solo el creador del proyecto puede eliminarlo
-        if (currentUserService.IsAuthenticated &&
-            proyecto.CreadorId.HasValue &&
-            currentUserService.UsuarioId != proyecto.CreadorId)
+        if (proyecto.CreadorId != usuarioActualId)
         {
             return Result.Failure(Error.Forbidden("Solo el creador del proyecto puede eliminarlo."));
         }
@@ -162,6 +188,21 @@ internal sealed class ProyectoService(
         proyectoRepository.EliminarProyecto(proyecto);
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken);
         return Result.Success();
+    }
+
+    private bool PuedeVerUsuario(Guid usuarioId)
+    {
+        var actualId = currentUserService.UsuarioId;
+        if (!actualId.HasValue) return false;
+        return actualId.Value == usuarioId || currentUserService.EsAdministrador;
+    }
+
+    private bool TieneAccesoAlProyecto(Proyecto proyecto)
+    {
+        var actualId = currentUserService.UsuarioId;
+        if (!actualId.HasValue) return false;
+        if (currentUserService.EsAdministrador) return true;
+        return proyecto.CreadorId == actualId.Value || proyecto.Usuarios.Any(u => u.Id == actualId.Value);
     }
 
     internal static ProyectoQueryDto MapearProyecto(Proyecto proyecto)

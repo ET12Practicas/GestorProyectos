@@ -27,12 +27,12 @@ internal sealed class UsuarioRepository(ProyectoDbContext context) : IUsuarioRep
             .FirstOrDefaultAsync(u => u.Id == usuarioId, cancellationToken);
     }
 
-    public async Task<bool> ExisteUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken = default)
+    public async Task<Usuario?> ObtenerUsuarioPorEmailAsync(string emailNormalizado, CancellationToken cancellationToken = default)
     {
-        return await context.Usuarios.AnyAsync(u => u.Id == usuarioId, cancellationToken);
+        return await context.Usuarios
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.NormalizedEmail == emailNormalizado, cancellationToken);
     }
-
-    public void AgregarUsuario(Usuario usuario) => context.Usuarios.Add(usuario);
 
     public void EliminarUsuario(Usuario usuario) => context.Usuarios.Remove(usuario);
 }

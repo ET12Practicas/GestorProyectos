@@ -1,6 +1,8 @@
 @page "/usuarios"
 @rendermode InteractiveServer
+@attribute [Authorize(Roles = "Administrador")]
 @inject IUsuarioService UsuarioService
+@inject ICurrentUserService CurrentUserService
 
 <PageTitle>Usuarios</PageTitle>
 
@@ -18,10 +20,7 @@
 }
 
 <div class="row g-4">
-    <div class="col-lg-4">
-    </div>
-
-    <div class="col-lg-8">
+    <div class="col-12">
         <section class="content-card">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h2 class="mb-0">Personas</h2>
@@ -41,13 +40,21 @@
                 <div class="user-list">
                     @foreach (var usuario in _usuarios)
                     {
-                        <div class="user-row">
-                            <div class="avatar">@Inicial(usuario.Nombre)</div>
-                            <div class="flex-grow-1">
-                                <strong>@usuario.Nombre</strong>
-                                <small>@usuario.Id</small>
+                        <div class="user-row d-flex align-items-center justify-content-between py-2 border-bottom">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="avatar">@Inicial(usuario.Nombre)</div>
+                                <div>
+                                    <strong>@usuario.Nombre</strong>
+                                    <div><small class="text-secondary">@usuario.Id</small></div>
+                                </div>
                             </div>
 
+                            @if (CurrentUserService.UsuarioId != usuario.Id)
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => SolicitarEliminar(usuario)">
+                                    Eliminar
+                                </button>
+                            }
                         </div>
                     }
                 </div>
@@ -56,12 +63,38 @@
     </div>
 </div>
 
+@if (_mostrarModalConfirmarEliminar)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Eliminar usuario</h5>
+                    <button type="button" class="btn-close" @onclick="() => _mostrarModalConfirmarEliminar = false"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="text-secondary mb-3">
+                        ¿Estás seguro de que deseas eliminar a <strong>@_usuarioAEliminar?.Nombre</strong> del sistema?<br />
+                        Esta acción es permanente y no se puede deshacer.
+                    </p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" @onclick="() => _mostrarModalConfirmarEliminar = false">Cancelar</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmarEliminarAsync">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private IReadOnlyList<UsuarioQueryDto> _usuarios = [];
 
     private bool _cargando;
     private bool _esError;
     private string? _mensaje;
+    private bool _mostrarModalConfirmarEliminar;
+    private UsuarioQueryDto? _usuarioAEliminar;
 
     protected override async Task OnInitializedAsync() => await CargarAsync();
 
@@ -83,7 +116,22 @@
         }
     }
 
+    private void SolicitarEliminar(UsuarioQueryDto usuario)
+    {
+        _usuarioAEliminar = usuario;
+        _mostrarModalConfirmarEliminar = true;
+    }
 
+    private async Task ConfirmarEliminarAsync()
+    {
+        if (_usuarioAEliminar is null) return;
+
+        var idAEliminar = _usuarioAEliminar.Id;
+        _mostrarModalConfirmarEliminar = false;
+        _usuarioAEliminar = null;
+
+        await EliminarAsync(idAEliminar);
+    }
 
     private async Task EliminarAsync(Guid usuarioId)
     {

@@ -22,8 +22,6 @@ public class Ticket
 
     public Proyecto? ProyectoTicket { get; set; }
 
-    public List<Comentario> Comentarios { get; set; } = [];
-
     public Ticket() { }
 
     public Ticket(string nombre, string descripcion = "")
@@ -33,6 +31,4 @@ public class Ticket
     }
 
     public void AgregarUsuario(Usuario usuario) => UsuarioTicket = usuario;
-
-    public void AgregarComentario(Comentario comentario) => Comentarios.Add(comentario);
 }

@@ -64,6 +64,14 @@
         {
             _error = "Por favor, completá todos los campos requeridos.";
         }
+        else if (Error == "bloqueado")
+        {
+            _error = "La cuenta fue bloqueada temporalmente por intentos fallidos. Probá nuevamente más tarde.";
+        }
+        else if (Error == "antiforgery")
+        {
+            _error = "La sesión del formulario expiró. Volvé a intentarlo.";
+        }
     }
 }
 

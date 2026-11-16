@@ -1,9 +1,6 @@
 @page "/"
 @rendermode InteractiveServer
 @inject IProyectoService ProyectoService
-@inject ITicketService TicketService
-@inject IUsuarioService UsuarioService
-@inject IComentarioService ComentarioService
 @inject ICurrentUserService CurrentUserService
 
 <PageTitle>Resumen - Gestor de Proyectos</PageTitle>
@@ -43,16 +40,22 @@
                     <strong>@_tickets</strong>
                     <small>@_ticketsAbiertos abiertos</small>
                 </a>
-                <a class="metric-card" href="usuarios">
-                    <span>Compañeros</span>
-                    <strong>@_usuarios</strong>
-                    <small>usuarios en el sistema</small>
-                </a>
-                <a class="metric-card" href="comentarios">
-                    <span>Aportes</span>
-                    <strong>@_comentarios</strong>
-                    <small>comentarios</small>
-                </a>
+                @if (CurrentUserService.EsAdministrador)
+                {
+                    <a class="metric-card" href="usuarios">
+                        <span>Compañeros</span>
+                        <strong>@_companeros</strong>
+                        <small>colaboradores en mis proyectos</small>
+                    </a>
+                }
+                else
+                {
+                    <div class="metric-card">
+                        <span>Compañeros</span>
+                        <strong>@_companeros</strong>
+                        <small>colaboradores en mis proyectos</small>
+                    </div>
+                }
             </div>
 
             <section class="content-card mt-4">
@@ -86,8 +89,7 @@
     private int _tickets;
     private int _ticketsAbiertos;
     private int _ticketsCerrados;
-    private int _usuarios;
-    private int _comentarios;
+    private int _companeros;
 
     private int PorcentajeCerrados =>
         _tickets == 0 ? 0 : (int)Math.Round(_ticketsCerrados * 100d / _tickets);
@@ -104,22 +106,19 @@
         try
         {
             var misProyectos = await ProyectoService.ObtenerProyectosDelUsuarioAsync(CurrentUserService.UsuarioId.Value);
-            var todosLosTickets = new List<TicketQueryDto>();
-            foreach (var p in misProyectos)
-            {
-                var ticketsDelProyecto = await TicketService.ObtenerTicketsPorProyectoAsync(p.Id);
-                todosLosTickets.AddRange(ticketsDelProyecto);
-            }
+            var todosLosTickets = misProyectos.SelectMany(p => p.Tickets).ToList();
 
-            var usuarios = await UsuarioService.ObtenerUsuariosAsync();
-            var comentarios = await ComentarioService.ObtenerComentariosAsync();
+            var companeros = misProyectos
+                .SelectMany(p => p.Usuarios)
+                .Where(u => u.Id != CurrentUserService.UsuarioId.Value)
+                .DistinctBy(u => u.Id)
+                .ToList();
 
             _proyectos = misProyectos.Count;
             _tickets = todosLosTickets.Count;
             _ticketsAbiertos = todosLosTickets.Count(t => t.Estado == EEstadoTicket.Abierto || t.Estado == EEstadoTicket.EnProgreso);
             _ticketsCerrados = todosLosTickets.Count(t => t.Estado == EEstadoTicket.Cerrado);
-            _usuarios = usuarios.Count;
-            _comentarios = comentarios.Count;
+            _companeros = companeros.Count;
         }
         catch (Exception ex)
         {

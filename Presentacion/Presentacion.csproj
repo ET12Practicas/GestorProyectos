@@ -11,9 +11,14 @@
   <ItemGroup>
     <PackageReference Include="Carter" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
-    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.8.2" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.6.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.14.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.14.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.14.0" PrivateAssets="all" />
+    <!-- Fija MSBuild parcheado (CVE-2025-26646 y CVE-2025-55247); Workspaces.MSBuild 4.14.0 arrastra 17.7.2 vulnerable -->
+    <PackageReference Include="Microsoft.Build" Version="17.14.28" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.14.28" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.14.28" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.14.28" PrivateAssets="all" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.18">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

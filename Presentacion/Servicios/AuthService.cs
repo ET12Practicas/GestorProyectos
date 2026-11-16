@@ -64,12 +64,17 @@ public sealed class AuthService(
             return Result.Failure<UsuarioAutenticadoDto>(Error.Unauthorized("Credenciales inválidas."));
         }
 
-        // Valida password y emite cookie de sesión en la respuesta HTTP
         var resultado = await signInManager.PasswordSignInAsync(
             usuario,
             dto.Password,
             isPersistent: dto.Recordarme,
-            lockoutOnFailure: false);
+            lockoutOnFailure: true);
+
+        if (resultado.IsLockedOut)
+        {
+            return Result.Failure<UsuarioAutenticadoDto>(Error.Forbidden(
+                "La cuenta fue bloqueada temporalmente por intentos fallidos. Probá nuevamente más tarde."));
+        }
 
         if (!resultado.Succeeded)
         {
@@ -77,7 +82,7 @@ public sealed class AuthService(
         }
 
         // Emitir token JWT
-        var (token, expiraEn) = tokenService.GenerarToken(usuario);
+        var (token, expiraEn) = await tokenService.GenerarTokenAsync(usuario);
 
         return Result.Success(new UsuarioAutenticadoDto
         {

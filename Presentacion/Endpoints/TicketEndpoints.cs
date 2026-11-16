@@ -1,4 +1,3 @@
-using Aplicacion.Funcionalidades.Comentarios;
 using Aplicacion.Funcionalidades.Tickets;
 using Carter;
 
@@ -14,7 +13,7 @@ public sealed class TicketEndpoints : ICarterModule
         {
             var tickets = await service.ObtenerTicketsAsync(ct);
             return Results.Ok(tickets);
-        }).RequireAuthorization();
+        }).RequireAuthorization("SoloAdministradores");
 
         group.MapGet("/{ticketId:guid}", async (ITicketService service, Guid ticketId, CancellationToken ct) =>
         {
@@ -58,27 +57,6 @@ public sealed class TicketEndpoints : ICarterModule
         {
             var result = await service.EliminarTicketAsync(ticketId, ct);
             return result.ToHttpResult();
-        }).RequireAuthorization();
-
-        // Sub-recursos de comentarios del ticket
-        group.MapGet("/{ticketId:guid}/comentarios", async (
-            IComentarioService comentarioService,
-            Guid ticketId,
-            CancellationToken ct) =>
-        {
-            var comentarios = await comentarioService.ObtenerComentariosPorTicketAsync(ticketId, ct);
-            return Results.Ok(comentarios);
-        }).RequireAuthorization();
-
-        group.MapPost("/{ticketId:guid}/usuarios/{usuarioId:guid}/comentarios", async (
-            IComentarioService comentarioService,
-            Guid ticketId,
-            Guid usuarioId,
-            ComentarioCommandDto dto,
-            CancellationToken ct) =>
-        {
-            var result = await comentarioService.CrearComentarioAsync(ticketId, usuarioId, dto, ct);
-            return result.ToHttpResult($"/api/comentarios/{result.Value}");
         }).RequireAuthorization();
     }
 }

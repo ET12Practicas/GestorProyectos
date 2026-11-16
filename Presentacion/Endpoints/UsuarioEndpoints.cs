@@ -9,7 +9,7 @@ public sealed class UsuarioEndpoints : ICarterModule
     {
         var group = app.MapGroup("/api/usuarios")
             .WithTags("Usuarios")
-            .RequireAuthorization();
+            .RequireAuthorization("SoloAdministradores");
 
         group.MapGet("/", async (IUsuarioService service, CancellationToken ct) =>
         {
@@ -28,5 +28,19 @@ public sealed class UsuarioEndpoints : ICarterModule
             var result = await service.EliminarUsuarioAsync(usuarioId, ct);
             return result.ToHttpResult();
         });
+
+        app.MapGet("/api/usuarios/buscar", async (
+            string email,
+            IUsuarioService usuarioService,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Results.BadRequest(new { mensaje = "El email de búsqueda es requerido." });
+            }
+
+            var usuario = await usuarioService.ObtenerUsuarioPorEmailAsync(email, ct);
+            return usuario is not null ? Results.Ok(usuario) : Results.NotFound();
+        }).RequireAuthorization().WithTags("Usuarios");
     }
 }
